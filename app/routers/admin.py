@@ -1,12 +1,24 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..db import get_db
 from ..utils.security import hash_password, verify_password
+from ..utils.jwt_token import create_access_token, decode_access_token
 from ..database.madels_db import Admins
+
+bearer_scheme = HTTPBearer()
+
+
+def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None or payload.get("role") != "admin":
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    return payload
 
 # в файле функционал для админов
 # 1 - регистрация админа
@@ -24,7 +36,7 @@ from ..database.madels_db import Admins
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-# 1 - регистрация админа
+# 0 - регистрация админа
 class AdminRegister(BaseModel):
     email: EmailStr
     password: str
@@ -48,7 +60,7 @@ class AdminRegister(BaseModel):
         return v
 
 
-# 2 - вход в админ панель
+# 1 - вход в админ панель
 class AdminLogin(BaseModel):
     email: EmailStr
     password: str
@@ -72,7 +84,7 @@ class AdminLogin(BaseModel):
         return v
 
 
-# 1 - регистрация админа
+# 0 - регистрация админа
 @router.post("/register")
 async def admin_register(
     admin: AdminRegister,
@@ -99,7 +111,7 @@ async def admin_register(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 2 - вход в админ панель
+# 1 - вход в админ панель
 @router.post("/login")
 async def admin_login(
     admin: AdminLogin,
@@ -110,8 +122,6 @@ async def admin_login(
         select(Admins).filter_by(email_admin=admin.email)
     )
     existing_admin = result.scalar_one_or_none()
-    # вот тут код чтобы вывести в браузер ответ 
-    # return {"data": str(existing_admin.__dict__)}
 
     # Если админа нет, возвращаешь ошибку
     if not existing_admin:
@@ -125,4 +135,11 @@ async def admin_login(
             errors=[{"msg": "ADMIN_LOGIN_PASSWORD_INVALID", "loc": (), "type": "value_error"}]
         )
 
-    return {"message": f"Admin {admin.email} logged in successfully"}
+    token = create_access_token({"sub": existing_admin.email_admin, "role": "admin"})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+# Защищённый роут — только для авторизованных админов
+@router.get("/me")
+async def admin_me(current_admin: dict = Depends(get_current_admin)):
+    return {"message": f"Добро пожаловать, {current_admin['sub']}"}

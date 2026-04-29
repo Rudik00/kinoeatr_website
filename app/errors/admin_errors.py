@@ -16,10 +16,10 @@ def handle_admin_register_errors(code: str) -> JSONResponse:
 def handle_admin_login_errors(code: str) -> JSONResponse:
     messages = {
         "ADMIN_LOGIN_EMAIL_EMPTY":    "Строка email не может быть пустой",
-        "ADMIN_LOGIN_EMAIL_INVALID":  "Некорректный email адрес",
+        "ADMIN_LOGIN_EMAIL_INVALID":  "Неверный email или пароль",
         "ADMIN_LOGIN_PASSWORD_EMPTY": "Пароль не может быть пустым или меньше 8 символов",
-        "ADMIN_LOGIN_NO_EMAIL": "Админ с таким email не найден",
-        "ADMIN_LOGIN_PASSWORD_INVALID": "Неверный пароль",
+        "ADMIN_LOGIN_NO_EMAIL": "Неверный email или пароль",
+        "ADMIN_LOGIN_PASSWORD_INVALID": "Неверный email или пароль",
     }
 
     text = messages[code]

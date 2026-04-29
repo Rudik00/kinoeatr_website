@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+
 
 # обработчики ошибок
 from .errors.admin_errors import (
@@ -26,6 +28,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Cinema Reservation API", lifespan=lifespan)
+
+# статические файлы (фронтенд)
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
+
 # роутеры
 app.include_router(admin_router)
 
@@ -49,3 +55,13 @@ async def validation_error_handler(
         status_code=422,
         content={"detail": "Ошибка валидации"},
     )
+
+
+@app.get("/admin/login")
+async def login_page():
+    return FileResponse("frontend/admin/login.html")
+
+
+@app.get("/admin/dashboard")
+async def dashboard_page():
+    return FileResponse("frontend/admin/dashboard.html")
