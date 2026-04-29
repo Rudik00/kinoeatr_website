@@ -9,28 +9,32 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
+# ____________________________________________________________________________________
+#                                    Админка
 
 
-# movies — фильмы
-# cinema_hall — залы
-# hall_seat — места в зале
-# movie_session — сеансы
-# registered_users — зарегистрированные пользователи
-# admins — администраторы
-# reservation — бронь (шапка)
-# reservation_seat — конкретные места в брони
-
-# Каталог фильмов
-class Movies(Base):
-    __tablename__ = "movies"
+# Отдельная таблица для сотрудников/администраторов.
+# Не смешивается с обычными пользователями.
+class Admins(Base):
+    __tablename__ = "admins"
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-    duration = Column(Integer, nullable=False)
-    show_date = Column(String, nullable=False)
-    show_time = Column(String, nullable=False)
-    description = Column(String, nullable=False)
-    release_date = Column(String, nullable=False)
-    preview_foto = Column(String, nullable=False)
+    email_admin = Column(String, nullable=False)
+    password_admin = Column(String, nullable=False)
+# ____________________________________________________________________________________  
+#                                    Пользователи
+
+
+# Аккаунты пользователей: имя, почта, телефон, хешированный пароль.
+class Registered_users(Base):
+    __tablename__ = "registered_users"
+    id = Column(Integer, primary_key=True)
+    name_user = Column(String, nullable=False)
+    surname_user = Column(String, nullable=False)
+    email_user = Column(String, nullable=False)
+    number_telephone_user = Column(String, nullable=False)
+    password_user = Column(String, nullable=False)
+# ___________________________________________________________________________________
+#                                   Территория кинотеатра
 
 
 # Список залов кинотеатра.
@@ -53,6 +57,21 @@ class HallSeat(Base):
     __table_args__ = (
         UniqueConstraint("hall_id", "seat_row", "seat_number", name="uq_hall_row_number"),
     )
+# ___________________________________________________________________________________
+#                                   Фильмы и сеансы
+
+
+# Каталог фильмов
+class Movies(Base):
+    __tablename__ = "movies"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    duration = Column(Integer, nullable=False)
+    show_date = Column(String, nullable=False)
+    show_time = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    release_date = Column(String, nullable=False)
+    preview_foto = Column(String, nullable=False)
 
 
 # Конкретный сеанс: какой фильм, в каком зале, в какое время.
@@ -63,28 +82,18 @@ class MovieSession(Base):
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     hall_id = Column(Integer, ForeignKey("cinema_hall.id", ondelete="RESTRICT"), nullable=False)
     starts_at = Column(DateTime, nullable=False)
+# ___________________________________________________________________________________
+#                                      Бронирование
 
 
-# Аккаунты пользователей: имя, почта, телефон, хешированный пароль.
-class Registered_users(Base):
-    __tablename__ = "registered_users"
+# Шапка брони: кто бронирует и на какой сеанс.
+class Reservation(Base):
+    __tablename__ = "reservation"
     id = Column(Integer, primary_key=True)
-    name_user = Column(String, nullable=False)
-    surname_user = Column(String, nullable=False)
-    email_user = Column(String, nullable=False)
-    number_telephone_user = Column(String, nullable=False)
-    password_user = Column(String, nullable=False)
-
-
-# Отдельная таблица для сотрудников/администраторов.
-# Не смешивается с обычными пользователями.
-class Admins(Base):
-    __tablename__ = "admins"
-    id = Column(Integer, primary_key=True)
-    name_admin = Column(String, nullable=False)
-    surname_admin = Column(String, nullable=False)
-    email_admin = Column(String, nullable=False)
-    password_admin = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("registered_users.id", ondelete="SET NULL"), nullable=True)
+    guest_name = Column(String, nullable=True)
+    guest_email = Column(String, nullable=True)
+    session_id = Column(Integer, ForeignKey("movie_session.id", ondelete="CASCADE"), nullable=False)
 
 
 # Детали брони:
