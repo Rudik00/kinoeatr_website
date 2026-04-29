@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -104,23 +105,24 @@ async def admin_login(
     admin: AdminLogin,
     db: AsyncSession = Depends(get_db)
 ):
-    try:
-        # Проверяешь, существует ли админ с таким email
-        result = await db.execute(
-            select(Admins).filter_by(email_admin=admin.email)
+    # Проверяешь, существует ли админ с таким email
+    result = await db.execute(
+        select(Admins).filter_by(email_admin=admin.email)
+    )
+    existing_admin = result.scalar_one_or_none()
+    # вот тут код чтобы вывести в браузер ответ 
+    # return {"data": str(existing_admin.__dict__)}
+
+    # Если админа нет, возвращаешь ошибку
+    if not existing_admin:
+        raise RequestValidationError(
+            errors=[{"msg": "ADMIN_LOGIN_NO_EMAIL", "loc": (), "type": "value_error"}]
         )
-        existing_admin = result.scalar_one_or_none()
 
-        if not existing_admin:
-            raise HTTPException(status_code=404, detail="Admin not found")
+    # Проверяешь пароль
+    if not verify_password(admin.password, existing_admin.password_admin):
+        raise RequestValidationError(
+            errors=[{"msg": "ADMIN_LOGIN_PASSWORD_INVALID", "loc": (), "type": "value_error"}]
+        )
 
-        # Проверяешь пароль
-        if not verify_password(admin.password, existing_admin.password_admin):
-            raise HTTPException(status_code=401, detail="Invalid password")
-
-        return {"message": f"Admin {admin.email} logged in successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": f"Admin {admin.email} logged in successfully"}

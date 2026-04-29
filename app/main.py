@@ -16,6 +16,9 @@ from .database.create_db import init_db
 from contextlib import asynccontextmanager
 
 
+# при запуске приложения выполняется init_db,
+# который создает таблицы в базе данных,
+# если их нет
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()   # выполняется один раз при запуске
@@ -41,10 +44,6 @@ async def validation_error_handler(
 
         if code.startswith("ADMIN_LOGIN_"):
             return handle_admin_login_errors(code)
-
-        # сюда потом добавишь:
-        # if code.startswith("ADMIN_HALL_"): ...
-        # if code.startswith("USER_LOGIN_"): ...
 
     return JSONResponse(
         status_code=422,
