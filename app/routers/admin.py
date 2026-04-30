@@ -21,43 +21,18 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer
     return payload
 
 # в файле функционал для админов
-# 1 - регистрация админа
-# 2 - вход в админ панель
-# 3 - добавление зала
-# 4 - добавление фильма
-# 5 - добавление сеанса
-# 6 - просмотр всех бронирований
-# 7 - просмотр всех фильмов, залов, сеансов
-# 8 - редактирование фильма, зала, сеанса
-# 9 - удаление фильма, зала, сеанса
+# 1 - вход в админ панель
+# 2 - добавление зала
+# 3 - добавление фильма
+# 4 - добавление сеанса
+# 5 - просмотр всех бронирований
+# 6 - просмотр всех фильмов, залов, сеансов
+# 7 - редактирование фильма, зала, сеанса
+# 8 - удаление фильма, зала, сеанса
 
 
 # admin.py — создаем роутер
 router = APIRouter(prefix="/admin", tags=["Admin"])
-
-
-# 0 - регистрация админа
-class AdminRegister(BaseModel):
-    email: EmailStr
-    password: str
-
-    @field_validator("email", mode="before")
-    @classmethod
-    def email_must_be_lowercase(cls, v):
-        if not v or v.strip() == "":
-            raise ValueError("ADMIN_REGISTER_EMAIL_EMPTY")
-        if "@" not in v:
-            raise ValueError("ADMIN_REGISTER_EMAIL_INVALID")
-        return v.lower()
-
-    @field_validator("password", mode="before")
-    @classmethod
-    def password_must_be_valid(cls, v):
-        if not v or v.strip() == "":
-            raise ValueError("ADMIN_REGISTER_PASSWORD_EMPTY")
-        if len(v) < 8:
-            raise ValueError("ADMIN_REGISTER_PASSWORD_INVALID")
-        return v
 
 
 # 1 - вход в админ панель
@@ -82,33 +57,6 @@ class AdminLogin(BaseModel):
         if len(v) < 8:
             raise ValueError("ADMIN_LOGIN_PASSWORD_INVALID")
         return v
-
-
-# 0 - регистрация админа
-@router.post("/register")
-async def admin_register(
-    admin: AdminRegister,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        # Создаешь объект модели
-        new_admin = Admins(
-            email_admin=admin.email,
-            password_admin=hash_password(admin.password),  # функция хеша
-        )
-
-        # Добавляешь в БД
-        db.add(new_admin)
-        await db.commit()
-        await db.refresh(new_admin)
-
-        return {"id": new_admin.id, "message": "Admin created"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()  # откатываешь изменения при ошибке
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # 1 - вход в админ панель

@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 
 # обработчики ошибок
 from .errors.admin_errors import (
-    handle_admin_register_errors,
     handle_admin_login_errors,
 )
 
@@ -44,9 +43,6 @@ async def validation_error_handler(
     for error in exc.errors():
         # достаем наш код из msg (Pydantic добавляет "Value error, " в начало)
         code = error.get("msg", "").replace("Value error, ", "")
-
-        if code.startswith("ADMIN_REGISTER_"):
-            return handle_admin_register_errors(code)
 
         if code.startswith("ADMIN_LOGIN_"):
             return handle_admin_login_errors(code)
