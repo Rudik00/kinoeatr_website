@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Список Залов</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --ink: #162033;
+      --muted: #64748b;
+      --panel: #ffffff;
+      --line: #e2e8f0;
+      --accent: #0f766e;
+      --accent-hover: #115e59;
+      --danger: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(140deg, #eff6ff 0%, #f8fafc 50%, #ecfeff 100%);
+      color: var(--ink);
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 34px);
+      letter-spacing: 0.01em;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-ghost {
+      background: #fff;
+      color: #0f172a;
+      border: 1px solid var(--line);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+
+    th {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: #fcfdff;
+    }
+
+    .empty {
+      padding: 28px 16px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    .status.error {
+      display: block;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--danger);
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .actions {
+        width: 100%;
+      }
+
+      .btn {
+        text-align: center;
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Залы Кинотеатра</h1>
+      <div class="actions">
+        <a class="btn btn-ghost" href="/admin/dashboard">Назад в админку</a>
+        <a class="btn btn-primary" href="/admin/halls/create">Создать зал</a>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <p class="hint">Список уже созданных залов</p>
+        <button id="refresh-btn" class="btn btn-ghost" type="button">Обновить</button>
+      </div>
+
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Название</th>
+              <th>Рядов</th>
+              <th>Мест</th>
+            </tr>
+          </thead>
+          <tbody id="halls-body"></tbody>
+        </table>
+      </div>
+
+      <div id="empty" class="empty">Залов пока нет</div>
+    </section>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const API = {
+      me: "/admin/me",
+      halls: "/admin/halls",
+      login: "/admin/login",
+    };
+
+    const hallsBody = document.getElementById("halls-body");
+    const empty = document.getElementById("empty");
+    const statusBox = document.getElementById("status");
+    const refreshBtn = document.getElementById("refresh-btn");
+
+    function token() {
+      return localStorage.getItem("admin_token");
+    }
+
+    function showError(text) {
+      statusBox.className = "status error";
+      statusBox.textContent = text;
+    }
+
+    function clearError() {
+      statusBox.className = "status";
+      statusBox.textContent = "";
+    }
+
+    function normalizeHalls(data) {
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.halls)) return data.halls;
+      return [];
+    }
+
+    function renderHalls(halls) {
+      hallsBody.innerHTML = "";
+
+      if (halls.length === 0) {
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+
+      for (const hall of halls) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${hall.id ?? "-"}</td>
+          <td>${hall.name_hall ?? hall.name ?? "-"}</td>
+          <td>${hall.rows_count ?? hall.rows ?? "-"}</td>
+          <td>${hall.total_seats ?? hall.seats ?? "-"}</td>
+        `;
+        hallsBody.appendChild(tr);
+      }
+    }
+
+    async function ensureAdmin() {
+      const t = token();
+      if (!t) {
+        window.location.href = API.login;
+        return false;
+      }
+
+      try {
+        const meResp = await fetch(API.me, {
+          headers: { Authorization: `Bearer ${t}` },
+        });
+
+        if (!meResp.ok) {
+          localStorage.removeItem("admin_token");
+          window.location.href = API.login;
+          return false;
+        }
+      } catch {
+        showError("Не удалось проверить авторизацию.");
+        return false;
+      }
+
+      return true;
+    }
+
+    async function loadHalls() {
+      clearError();
+      const t = token();
+      if (!t) return;
+
+      try {
+        const response = await fetch(API.halls, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${t}` },
+        });
+
+        if (!response.ok) {
+          if (response.status === 405) {
+            showError("GET /admin/halls пока не реализован на backend. Когда добавишь endpoint списка залов, эта страница начнет показывать данные автоматически.");
+            renderHalls([]);
+            return;
+          }
+
+          const text = await response.text();
+          showError(`Ошибка загрузки залов: ${response.status}\n${text}`);
+          renderHalls([]);
+          return;
+        }
+
+        const payload = await response.json();
+        const halls = normalizeHalls(payload);
+        renderHalls(halls);
+      } catch {
+        showError("Сервер недоступен.");
+        renderHalls([]);
+      }
+    }
+
+    refreshBtn.addEventListener("click", loadHalls);
+
+    (async function init() {
+      const ok = await ensureAdmin();
+      if (!ok) return;
+      await loadHalls();
+    })();
+  </script>
+</body>
+</html>

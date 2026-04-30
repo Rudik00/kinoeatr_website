@@ -53,6 +53,7 @@ class HallSeat(Base):
     hall_id = Column(Integer, ForeignKey("cinema_hall.id", ondelete="CASCADE"), nullable=False)
     seat_row = Column(Integer, nullable=False)
     seat_number = Column(Integer, nullable=False)
+    category = Column(String, default="standard") # standard, vip, premium
 
     __table_args__ = (
         UniqueConstraint("hall_id", "seat_row", "seat_number", name="uq_hall_row_number"),
@@ -67,8 +68,6 @@ class Movies(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     duration = Column(Integer, nullable=False)
-    show_date = Column(String, nullable=False)
-    show_time = Column(String, nullable=False)
     description = Column(String, nullable=False)
     release_date = Column(String, nullable=False)
     preview_foto = Column(String, nullable=False)
@@ -82,6 +81,7 @@ class MovieSession(Base):
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     hall_id = Column(Integer, ForeignKey("cinema_hall.id", ondelete="RESTRICT"), nullable=False)
     starts_at = Column(DateTime, nullable=False)
+    base_price = Column(Integer, nullable=False) # Базовая цена билета на этот сеанс
 # ___________________________________________________________________________________
 #                                      Бронирование
 
@@ -107,6 +107,7 @@ class ReservationSeat(Base):
     reservation_id = Column(Integer, ForeignKey("reservation.id", ondelete="CASCADE"), nullable=False)
     session_id = Column(Integer, ForeignKey("movie_session.id", ondelete="CASCADE"), nullable=False)
     seat_id = Column(Integer, ForeignKey("hall_seat.id", ondelete="RESTRICT"), nullable=False)
+    final_price = Column(Integer, nullable=False) # Цена на момент покупки
 
     # КЛЮЧЕВОЕ ОГРАНИЧЕНИЕ: одно место в одном сеансе только один раз
     __table_args__ = (

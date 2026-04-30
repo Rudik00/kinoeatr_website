@@ -1,0 +1,278 @@
+:root {
+  --bg: #f4f6ff;
+  --panel: rgba(255, 255, 255, 0.8);
+  --ink: #1a1f36;
+  --muted: #5d668a;
+  --line: #d9ddf0;
+  --brand: #0f766e;
+  --brand-strong: #115e59;
+  --danger: #b91c1c;
+  --shadow: 0 12px 40px rgba(17, 24, 39, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1300px 700px at 10% 10%, #e0f2fe 0%, transparent 60%),
+    radial-gradient(1100px 650px at 90% 20%, #d1fae5 0%, transparent 58%),
+    linear-gradient(160deg, #f8fbff 0%, #eef2ff 55%, #f9fafb 100%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.bg-orb {
+  position: fixed;
+  border-radius: 999px;
+  filter: blur(24px);
+  opacity: 0.28;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bg-orb-1 {
+  width: 260px;
+  height: 260px;
+  background: #22d3ee;
+  top: -60px;
+  right: -40px;
+}
+
+.bg-orb-2 {
+  width: 320px;
+  height: 320px;
+  background: #34d399;
+  bottom: -100px;
+  left: -80px;
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, 94vw);
+  margin: 36px auto;
+  display: grid;
+  grid-template-columns: 0.95fr 1.35fr;
+  gap: 22px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+}
+
+.panel-left {
+  padding: 28px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin: 0 0 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.03em;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+}
+
+.lead {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.contract {
+  margin: 0;
+  background: #0f172a;
+  color: #cffafe;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: auto;
+}
+
+.rules {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  color: #374151;
+  line-height: 1.7;
+}
+
+.panel-right {
+  padding: 24px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-size: 13px;
+  color: #45506f;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 11px 12px;
+  font: inherit;
+  background: #ffffff;
+  color: var(--ink);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.15);
+}
+
+.rows-container {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.row-card {
+  border: 1px solid #dbe2f6;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.row-title-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.row-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: var(--brand-strong);
+}
+
+.btn-secondary {
+  background: #e0f2fe;
+  color: #0c4a6e;
+}
+
+.btn-secondary:hover {
+  background: #bae6fd;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #d0d7ef;
+  color: #364152;
+}
+
+.remove-row-btn {
+  background: transparent;
+  border: 0;
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.form-footer {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+}
+
+.result-box {
+  margin-top: 16px;
+  border: 1px dashed #bfd7f7;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+#result-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #0b2447;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .row-grid {
+    grid-template-columns: 1fr;
+  }
+}

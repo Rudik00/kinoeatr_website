@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 # обработчики ошибок
 from .errors.admin_errors import (
     handle_admin_login_errors,
+    handle_hall_create_errors,
 )
 
 # роутеры
@@ -47,6 +48,9 @@ async def validation_error_handler(
         if code.startswith("ADMIN_LOGIN_"):
             return handle_admin_login_errors(code)
 
+        if code.startswith("HALL_"):
+            return handle_hall_create_errors(code)
+
     return JSONResponse(
         status_code=422,
         content={"detail": "Ошибка валидации"},
@@ -61,3 +65,13 @@ async def login_page():
 @app.get("/admin/dashboard")
 async def dashboard_page():
     return FileResponse("frontend/admin/dashboard.html")
+
+
+@app.get("/admin/halls")
+async def halls_page():
+    return FileResponse("frontend/admin/halls/index.html")
+
+
+@app.get("/admin/halls/create")
+async def halls_create_page():
+    return FileResponse("frontend/admin/creation_hall/index.html")

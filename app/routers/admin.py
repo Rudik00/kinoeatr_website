@@ -4,21 +4,17 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from typing import List
 
 from ..db import get_db
-from ..utils.security import hash_password, verify_password
+from ..utils.security import verify_password
 from ..utils.jwt_token import create_access_token, decode_access_token
-from ..database.madels_db import Admins
+from ..database.madels_db import (
+    Admins,
+    HallSeat, CinemaHall,
+)
 
 bearer_scheme = HTTPBearer()
-
-
-def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    token = credentials.credentials
-    payload = decode_access_token(token)
-    if payload is None or payload.get("role") != "admin":
-        raise HTTPException(status_code=401, detail="Не авторизован")
-    return payload
 
 # в файле функционал для админов
 # 1 - вход в админ панель
@@ -35,7 +31,23 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-# 1 - вход в админ панель
+# функция для получения текущего админа из токена
+def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload is None or payload.get("role") != "admin":
+        raise HTTPException(status_code=401, detail="Не авторизован")
+    return payload
+
+
+# Защищённый роут — только админов
+@router.get("/me")
+async def admin_me(current_admin: dict = Depends(get_current_admin)):
+    return {"message": f"Добро пожаловать, {current_admin['sub']}"}
+
+
+# ________________________________________________________________________________
+#                                      1 - ВХОД В АДМИН ПАНЕЛЬ
 class AdminLogin(BaseModel):
     email: EmailStr
     password: str
@@ -59,7 +71,6 @@ class AdminLogin(BaseModel):
         return v
 
 
-# 1 - вход в админ панель
 @router.post("/login")
 async def admin_login(
     admin: AdminLogin,
@@ -87,7 +98,82 @@ async def admin_login(
     return {"access_token": token, "token_type": "bearer"}
 
 
-# Защищённый роут — только для авторизованных админов
-@router.get("/me")
-async def admin_me(current_admin: dict = Depends(get_current_admin)):
-    return {"message": f"Добро пожаловать, {current_admin['sub']}"}
+# ________________________________________________________________________________
+#                                   2 - ДОБАВЛЕНИЕ ЗАЛА
+# 1. Валидация конкретного ряда
+class RowConfig(BaseModel):
+    row_number: int
+    seats_count: int
+    category: str = "standard"
+
+    @field_validator("row_number")
+    @classmethod
+    def validate_row_number(cls, v):
+        # Поднял лимит, 20 может быть мало для больших залов
+        if v <= 0 or v > 50:
+            raise ValueError("ROW_NUMBER_INVALID")
+        return v
+
+    @field_validator("seats_count")
+    @classmethod
+    def validate_seats_count(cls, v):
+        if v <= 0 or v > 100:
+            raise ValueError("SEATS_COUNT_INVALID")
+        return v
+
+
+# 2. Валидация всего запроса на создание зала
+class HallCreate(BaseModel):
+    name: str
+    rows: List[RowConfig]
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        if not v.strip() or len(v) > 100:
+            raise ValueError("HALL_NAME_INVALID")
+        return v.strip()
+
+    @field_validator("rows")
+    @classmethod
+    def validate_rows(cls, v):
+        if not v:
+            raise ValueError("HALL_ROWS_EMPTY")
+        # Проверка на дубликаты номеров рядов
+        row_numbers = [r.row_number for r in v]
+        if len(row_numbers) != len(set(row_numbers)):
+            raise ValueError("DUPLICATE_ROW_NUMBERS")
+        return v
+
+
+# 3. Эндпоинт (с учетом асинхронности)
+@router.post("/halls")
+async def create_cinema_hall(
+    hall_data: HallCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # Создаем объект зала
+        new_hall = CinemaHall(name_hall=hall_data.name)
+        db.add(new_hall)
+
+        # flush() в асинхронном режиме требует await
+        await db.flush()
+
+        # Генерируем места
+        for row in hall_data.rows:
+            for seat_num in range(1, row.seats_count + 1):
+                seat = HallSeat(
+                    hall_id=new_hall.id,
+                    seat_row=row.row_number,
+                    seat_number=seat_num,
+                    category=row.category
+                )
+                db.add(seat)
+
+        await db.commit()
+        return {"status": "success", "hall_id": new_hall.id}
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))

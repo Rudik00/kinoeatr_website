@@ -13,3 +13,14 @@ def handle_admin_login_errors(code: str) -> JSONResponse:
     text = messages[code]
 
     return JSONResponse(status_code=422, content={"detail": text})
+
+
+def handle_hall_create_errors(code: str) -> JSONResponse:
+    messages = {
+        "HALL_NAME_EMPTY": "Название зала не может быть пустым",
+        "HALL_SEAT_ROWS_INVALID": "Неверное количество рядов",
+        "HALL_SEAT_NUMBERS_PER_ROW_INVALID": "Неверное количество мест в ряду",
+        "HALL_NAME_EXISTS": "Зал с таким названием уже существует",
+    }
+    text = messages[code]
+    return JSONResponse(status_code=422, content={"detail": text})
