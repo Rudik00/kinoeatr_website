@@ -140,6 +140,34 @@
       color: var(--danger);
     }
 
+    .actions-col {
+      width: 88px;
+      text-align: right;
+    }
+
+    .delete-btn {
+      border: 1px solid #fecaca;
+      background: #fff5f5;
+      color: var(--danger);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .delete-btn:hover {
+      background: #fee2e2;
+    }
+
+    .delete-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
     @media (max-width: 720px) {
       .topbar {
         flex-direction: column;
@@ -181,6 +209,7 @@
               <th>Название</th>
               <th>Рядов</th>
               <th>Мест</th>
+              <th class="actions-col">Удалить</th>
             </tr>
           </thead>
           <tbody id="halls-body"></tbody>
@@ -195,8 +224,9 @@
 
   <script>
     const API = {
-      me: "/admin/me",
-      halls: "/admin/halls",
+      me: "/admin/api/me",
+      halls: "/admin/api/halls",
+      deleteHall: (id) => `/admin/api/halls/${id}`,
       login: "/admin/login",
     };
 
@@ -242,8 +272,42 @@
           <td>${hall.name_hall ?? hall.name ?? "-"}</td>
           <td>${hall.rows_count ?? hall.rows ?? "-"}</td>
           <td>${hall.total_seats ?? hall.seats ?? "-"}</td>
+          <td class="actions-col">
+            <button class="delete-btn" type="button" data-hall-id="${hall.id}" aria-label="Удалить зал">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-2 2h8v12H8V7zm2 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1z"/>
+              </svg>
+            </button>
+          </td>
         `;
         hallsBody.appendChild(tr);
+      }
+    }
+
+    async function deleteHall(hallId) {
+      const t = token();
+      if (!t) return;
+
+      const confirmed = window.confirm(`Удалить зал #${hallId}?`);
+      if (!confirmed) return;
+
+      clearError();
+
+      try {
+        const response = await fetch(API.deleteHall(hallId), {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${t}` },
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          showError(`Ошибка удаления зала: ${response.status}\n${text}`);
+          return;
+        }
+
+        await loadHalls();
+      } catch {
+        showError("Сервер недоступен.");
       }
     }
 
@@ -285,7 +349,7 @@
 
         if (!response.ok) {
           if (response.status === 405) {
-            showError("GET /admin/halls пока не реализован на backend. Когда добавишь endpoint списка залов, эта страница начнет показывать данные автоматически.");
+            showError("GET /admin/api/halls пока не реализован на backend. Когда добавишь endpoint списка залов, эта страница начнет показывать данные автоматически.");
             renderHalls([]);
             return;
           }
@@ -304,6 +368,14 @@
         renderHalls([]);
       }
     }
+
+    hallsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-hall-id]");
+      if (!button) return;
+      const hallId = Number(button.dataset.hallId);
+      if (!Number.isInteger(hallId)) return;
+      deleteHall(hallId);
+    });
 
     refreshBtn.addEventListener("click", loadHalls);
 

@@ -1,7 +1,7 @@
 const API = {
   loginPage: "/admin/login",
-  me: "/admin/me",
-  createHall: "/admin/halls",
+  me: "/admin/api/me",
+  createHall: "/admin/api/halls",
 };
 
 const hallForm = document.getElementById("hall-form");
