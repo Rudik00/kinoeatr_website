@@ -105,7 +105,7 @@
     <h2>🎬 Кинотеатр</h2>
     <a href="#" class="active">Главная</a>
     <a href="/admin/movies">Фильмы</a>
-    <a href="#">Сеансы</a>
+    <a href="/admin/sessions">Сеансы</a>
     <a href="/admin/halls">Залы</a>
     <a href="#">Бронирования</a>
     <div class="logout" onclick="logout()">Выйти</div>
@@ -121,19 +121,19 @@
     <div class="cards">
         <div class="card">
             <div class="label">Фильмов</div>
-            <div class="value">—</div>
+            <div class="value" id="stat-movies">—</div>
         </div>
         <div class="card">
             <div class="label">Сеансов</div>
-            <div class="value">—</div>
+            <div class="value" id="stat-sessions">—</div>
         </div>
         <div class="card">
             <div class="label">Бронирований</div>
-            <div class="value">—</div>
+            <div class="value" id="stat-bookings">—</div>
         </div>
         <div class="card">
             <div class="label">Залов</div>
-            <div class="value">—</div>
+            <div class="value" id="stat-halls">—</div>
         </div>
     </div>
 
@@ -167,6 +167,7 @@
 
             const data = await response.json();
             document.getElementById("admin-email").textContent = data.message;
+            await loadStats(token);
 
         } catch (e) {
             window.location.href = "/admin/login";
@@ -176,6 +177,22 @@
     function logout() {
         localStorage.removeItem("admin_token");
         window.location.href = "/admin/login";
+    }
+
+    async function loadStats(token) {
+        try {
+            const resp = await fetch("/admin/api/stats", {
+                headers: { "Authorization": "Bearer " + token }
+            });
+            if (!resp.ok) return;
+            const stats = await resp.json();
+            document.getElementById("stat-movies").textContent = stats.movies_count;
+            document.getElementById("stat-sessions").textContent = stats.sessions_count;
+            document.getElementById("stat-halls").textContent = stats.halls_count;
+            document.getElementById("stat-bookings").textContent = stats.bookings_count;
+        } catch (e) {
+            // stats not critical, silently ignore
+        }
     }
 
     checkAuth();

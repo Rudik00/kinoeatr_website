@@ -314,6 +314,7 @@
 
 				setStatus("Фильм успешно создан.", "ok");
 				form.reset();
+				setTimeout(() => { window.location.href = "/admin/movies"; }, 800);
 			} catch {
 				setStatus("Сервер недоступен.", "error");
 			} finally {

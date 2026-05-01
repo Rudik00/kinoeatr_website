@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from .errors.admin_errors import (
     handle_admin_login_errors,
     handle_hall_create_errors,
+    handle_movie_create_errors,
+    handle_session_create_errors,
 )
 
 # роутеры
@@ -51,6 +53,12 @@ async def validation_error_handler(
         if code.startswith("HALL_"):
             return handle_hall_create_errors(code)
 
+        if code.startswith("MOVIE_"):
+            return handle_movie_create_errors(code)
+        
+        if code.startswith("SESSION_"):
+            return handle_session_create_errors(code)
+
     return JSONResponse(
         status_code=422,
         content={"detail": "Ошибка валидации"},
@@ -59,29 +67,43 @@ async def validation_error_handler(
 
 @app.get("/admin/login")
 async def login_page():
-    return FileResponse("frontend/admin/login.html")
+    return FileResponse("frontend/admin/admin_login.html")
 
 
 @app.get("/admin/dashboard")
 async def dashboard_page():
-    return FileResponse("frontend/admin/dashboard.html")
+    return FileResponse("frontend/admin/admin_dashboard.html")
 
 
 @app.get("/admin/halls")
 async def halls_page():
-    return FileResponse("frontend/admin/halls/index.html")
+    return FileResponse("frontend/admin/output_halls/output_halls.html")
 
 
 @app.get("/admin/halls/create")
 async def halls_create_page():
-    return FileResponse("frontend/admin/creation_hall/index.html")
+    return FileResponse("frontend/admin/creation_hall/creation_hall.html")
 
 
 @app.get("/admin/movies")
 async def movies_page():
-    return FileResponse("frontend/admin/movies/index.html")
+    return FileResponse("frontend/admin/output_movies/output_movies.html")
 
 
 @app.get("/admin/movies/create")
 async def movies_create_page():
-    return FileResponse("frontend/admin/creation_movies/index.html")
+    return FileResponse("frontend/admin/creation_movies/creation_movies.html")
+
+
+@app.get("/admin/sessions")
+async def sessions_page():
+    return FileResponse(
+        "frontend/admin/output_movie_session/output_movie_session.html"
+    )
+
+
+@app.get("/admin/sessions/create")
+async def sessions_create_page():
+    return FileResponse(
+        "frontend/admin/creation_movie_session/creation_movie_session.html"
+    )

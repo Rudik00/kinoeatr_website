@@ -185,6 +185,7 @@ async function submitHall(event) {
     }
 
     setResult(JSON.stringify(data, null, 2));
+    window.location.href = "/admin/halls";
   } catch {
     setResult("Request failed. Backend may be down or URL may be wrong.", true);
   } finally {
