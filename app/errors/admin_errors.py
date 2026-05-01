@@ -24,3 +24,5 @@ def handle_hall_create_errors(code: str) -> JSONResponse:
     }
     text = messages[code]
     return JSONResponse(status_code=422, content={"detail": text})
+
+

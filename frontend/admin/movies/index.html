@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Список Фильмов</title>
+	<style>
+		:root {
+			--bg: #f3f6fb;
+			--ink: #162033;
+			--muted: #64748b;
+			--panel: #ffffff;
+			--line: #e2e8f0;
+			--accent: #0f766e;
+			--accent-hover: #115e59;
+			--danger: #b91c1c;
+		}
+
+		* { box-sizing: border-box; }
+
+		body {
+			margin: 0;
+			font-family: "Segoe UI", Tahoma, sans-serif;
+			background: linear-gradient(140deg, #eff6ff 0%, #f8fafc 50%, #ecfeff 100%);
+			color: var(--ink);
+		}
+
+		.wrap {
+			max-width: 1080px;
+			margin: 32px auto;
+			padding: 0 16px;
+		}
+
+		.topbar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 18px;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: clamp(24px, 4vw, 34px);
+			letter-spacing: 0.01em;
+		}
+
+		.actions {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+		}
+
+		.btn {
+			border: 0;
+			border-radius: 10px;
+			padding: 10px 14px;
+			cursor: pointer;
+			text-decoration: none;
+			font-weight: 600;
+			font-size: 14px;
+			display: inline-block;
+		}
+
+		.btn-primary {
+			background: var(--accent);
+			color: #fff;
+		}
+
+		.btn-primary:hover { background: var(--accent-hover); }
+
+		.btn-ghost {
+			background: #fff;
+			color: #0f172a;
+			border: 1px solid var(--line);
+		}
+
+		.panel {
+			background: var(--panel);
+			border: 1px solid var(--line);
+			border-radius: 16px;
+			overflow: hidden;
+			box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+		}
+
+		.panel-head {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 14px 16px;
+			border-bottom: 1px solid var(--line);
+			background: #f8fafc;
+		}
+
+		.hint {
+			margin: 0;
+			color: var(--muted);
+			font-size: 14px;
+		}
+
+		table {
+			width: 100%;
+			border-collapse: collapse;
+		}
+
+		th, td {
+			text-align: left;
+			padding: 12px 14px;
+			border-bottom: 1px solid var(--line);
+			font-size: 14px;
+			vertical-align: top;
+		}
+
+		th {
+			font-size: 12px;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+			color: var(--muted);
+			background: #fcfdff;
+		}
+
+		.empty {
+			padding: 28px 16px;
+			color: var(--muted);
+			text-align: center;
+		}
+
+		.status {
+			margin-top: 14px;
+			padding: 10px 12px;
+			border-radius: 10px;
+			font-size: 13px;
+			display: none;
+			white-space: pre-wrap;
+		}
+
+		.status.error {
+			display: block;
+			background: #fef2f2;
+			border: 1px solid #fecaca;
+			color: var(--danger);
+		}
+
+		.actions-col {
+			width: 88px;
+			text-align: right;
+		}
+
+		.delete-btn {
+			border: 1px solid #fecaca;
+			background: #fff5f5;
+			color: var(--danger);
+			width: 36px;
+			height: 36px;
+			border-radius: 10px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+		}
+
+		.delete-btn:hover {
+			background: #fee2e2;
+		}
+
+		.delete-btn svg {
+			width: 18px;
+			height: 18px;
+			fill: currentColor;
+		}
+
+		.desc {
+			max-width: 420px;
+			color: #334155;
+			line-height: 1.35;
+			word-break: break-word;
+		}
+
+		@media (max-width: 860px) {
+			.topbar {
+				flex-direction: column;
+				align-items: stretch;
+			}
+
+			.actions {
+				width: 100%;
+			}
+
+			.btn {
+				text-align: center;
+				flex: 1;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<div class="topbar">
+			<h1>Фильмы Кинотеатра</h1>
+			<div class="actions">
+				<a class="btn btn-ghost" href="/admin/dashboard">Назад в админку</a>
+				<a class="btn btn-primary" href="/admin/movies/create">Добавить фильм</a>
+			</div>
+		</div>
+
+		<section class="panel">
+			<div class="panel-head">
+				<p class="hint">Список уже добавленных фильмов</p>
+				<button id="refresh-btn" class="btn btn-ghost" type="button">Обновить</button>
+			</div>
+
+			<div style="overflow:auto;">
+				<table>
+					<thead>
+						<tr>
+							<th>ID</th>
+							<th>Название</th>
+							<th>Мин</th>
+							<th>Дата релиза</th>
+							<th>Описание</th>
+							<th class="actions-col">Удалить</th>
+						</tr>
+					</thead>
+					<tbody id="movies-body"></tbody>
+				</table>
+			</div>
+
+			<div id="empty" class="empty">Фильмов пока нет</div>
+		</section>
+
+		<div id="status" class="status"></div>
+	</div>
+
+	<script>
+		const API = {
+			me: "/admin/api/me",
+			movies: "/admin/api/movies",
+			deleteMovie: (id) => `/admin/api/movies/${id}`,
+			login: "/admin/login",
+		};
+
+		const moviesBody = document.getElementById("movies-body");
+		const empty = document.getElementById("empty");
+		const statusBox = document.getElementById("status");
+		const refreshBtn = document.getElementById("refresh-btn");
+
+		function token() {
+			return localStorage.getItem("admin_token");
+		}
+
+		function showError(text) {
+			statusBox.className = "status error";
+			statusBox.textContent = text;
+		}
+
+		function clearError() {
+			statusBox.className = "status";
+			statusBox.textContent = "";
+		}
+
+		function normalizeMovies(data) {
+			if (Array.isArray(data)) return data;
+			if (data && Array.isArray(data.movies)) return data.movies;
+			return [];
+		}
+
+		function renderMovies(movies) {
+			moviesBody.innerHTML = "";
+
+			if (movies.length === 0) {
+				empty.style.display = "block";
+				return;
+			}
+
+			empty.style.display = "none";
+
+			for (const movie of movies) {
+				const tr = document.createElement("tr");
+				tr.innerHTML = `
+					<td>${movie.id ?? "-"}</td>
+					<td>${movie.name ?? "-"}</td>
+					<td>${movie.duration ?? "-"}</td>
+					<td>${movie.release_date ?? "-"}</td>
+					<td class="desc">${movie.description ?? "-"}</td>
+					<td class="actions-col">
+						<button class="delete-btn" type="button" data-movie-id="${movie.id}" aria-label="Удалить фильм">
+							<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+								<path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-2 2h8v12H8V7zm2 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1z"/>
+							</svg>
+						</button>
+					</td>
+				`;
+				moviesBody.appendChild(tr);
+			}
+		}
+
+		async function ensureAdmin() {
+			const t = token();
+			if (!t) {
+				window.location.href = API.login;
+				return false;
+			}
+
+			try {
+				const meResp = await fetch(API.me, {
+					headers: { Authorization: `Bearer ${t}` },
+				});
+
+				if (!meResp.ok) {
+					localStorage.removeItem("admin_token");
+					window.location.href = API.login;
+					return false;
+				}
+			} catch {
+				showError("Не удалось проверить авторизацию.");
+				return false;
+			}
+
+			return true;
+		}
+
+		async function loadMovies() {
+			clearError();
+			const t = token();
+			if (!t) return;
+
+			try {
+				const response = await fetch(API.movies, {
+					method: "GET",
+					headers: { Authorization: `Bearer ${t}` },
+				});
+
+				if (!response.ok) {
+					const text = await response.text();
+					showError(`Ошибка загрузки фильмов: ${response.status}\n${text}`);
+					renderMovies([]);
+					return;
+				}
+
+				const payload = await response.json();
+				const movies = normalizeMovies(payload);
+				renderMovies(movies);
+			} catch {
+				showError("Сервер недоступен.");
+				renderMovies([]);
+			}
+		}
+
+		async function deleteMovie(movieId) {
+			const t = token();
+			if (!t) return;
+
+			const confirmed = window.confirm(`Удалить фильм #${movieId}?`);
+			if (!confirmed) return;
+
+			clearError();
+
+			try {
+				const response = await fetch(API.deleteMovie(movieId), {
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${t}` },
+				});
+
+				if (!response.ok) {
+					const text = await response.text();
+					showError(`Ошибка удаления фильма: ${response.status}\n${text}`);
+					return;
+				}
+
+				await loadMovies();
+			} catch {
+				showError("Сервер недоступен.");
+			}
+		}
+
+		moviesBody.addEventListener("click", (event) => {
+			const button = event.target.closest("[data-movie-id]");
+			if (!button) return;
+			const movieId = Number(button.dataset.movieId);
+			if (!Number.isInteger(movieId)) return;
+			deleteMovie(movieId);
+		});
+
+		refreshBtn.addEventListener("click", loadMovies);
+
+		(async function init() {
+			const ok = await ensureAdmin();
+			if (!ok) return;
+			await loadMovies();
+		})();
+	</script>
+</body>
+</html>

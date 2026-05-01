@@ -12,7 +12,12 @@ from ..utils.jwt_token import create_access_token, decode_access_token
 from ..database.madels_db import (
     Admins,
     HallSeat, CinemaHall,
+    Movies,
+    MovieSession,
 )
+
+import datetime
+
 
 bearer_scheme = HTTPBearer()
 
@@ -20,7 +25,8 @@ bearer_scheme = HTTPBearer()
 # 1 - вход в админ панель
 # 2 - добавление зала
 # 3 - просмотр залов
-#  - добавление фильма
+# 4 - добавление фильма
+# 5 - просмотр фильмов
 #  - добавление сеанса
 #  - просмотр всех бронирований
 #  - просмотр всех фильмов, сеансов
@@ -245,6 +251,123 @@ async def list_cinema_halls(db: AsyncSession = Depends(get_db)):
 
 
 # _________________________________________________________________________________________________
+#                                   4 - ДОБАВЛЕНИЕ ФИЛЬМА
+# Валидация данных фильма
+class MovieCreate(BaseModel):
+    name: str
+    duration: int
+    description: str
+    release_date: str
+    preview_foto: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        if not v.strip() or len(v) > 100:
+            raise ValueError("MOVIE_NAME_INVALID")
+        return v.strip()
+
+    @field_validator("duration")
+    @classmethod
+    def validate_duration(cls, v):
+        if v <= 0:
+            raise ValueError("MOVIE_DURATION_INVALID")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v):
+        if not v.strip() or v.strip() == "":
+            raise ValueError("MOVIE_DESCRIPTION_EMPTY")
+        return v.strip()
+
+    @field_validator("release_date")
+    @classmethod
+    def validate_release_date(cls, v):
+        # Проверка даты с пособием datetime или regex
+        # Для простоты примем формат "YYYY-MM-DD"
+        try:
+            datetime.datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("MOVIE_RELEASE_DATE_INVALID")
+        return v.strip()
+
+    @field_validator("preview_foto")
+    @classmethod
+    def validate_preview_foto(cls, v):
+        if not v.strip() or v.strip() == "":
+            raise ValueError("MOVIE_PREVIEW_FOTO_EMPTY")
+        return v.strip()
+
+
+# Эндпоинт для создания фильма
+@router.post("/api/movies")
+async def create_movie(
+    movie_data: MovieCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        # Создаем объект фильма
+        new_movie = Movies(
+            name=movie_data.name,
+            duration=movie_data.duration,
+            description=movie_data.description,
+            release_date=movie_data.release_date,
+            preview_foto=movie_data.preview_foto
+        )
+        existing_movies = (
+            await db.execute(select(Movies))
+        ).scalars().all()
+        if movie_data.name in [movie.name for movie in existing_movies]:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "MOVIE_NAME_EXISTS",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        db.add(new_movie)
+
+        # flush() в асинхронном режиме требует await
+        await db.flush()
+
+        await db.commit()
+        return {"status": "success", "movie_id": new_movie.id}
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, RequestValidationError):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# _________________________________________________________________________________________________
+#                                   5 - ПРОСМОТР ФИЛЬМОВ
+
+@router.get("/api/movies")
+async def list_movies(db: AsyncSession = Depends(get_db)):
+    result_movies = await db.execute(select(Movies))
+    movies = result_movies.scalars().all()
+
+    return {
+        "movies": [
+            {
+                "id": movie.id,
+                "name": movie.name,
+                "duration": movie.duration,
+                "release_date": movie.release_date,
+                "description": movie.description,
+                "preview_foto": movie.preview_foto,
+            }
+            for movie in movies
+        ]
+    }
+
+
+# _________________________________________________________________________________________________
 #                                    - УДАЛЕНИЕ
 
 # Удаление зала (только если к нему нет сеансов)
@@ -270,3 +393,28 @@ async def delete_cinema_hall(
                 "Не удалось удалить зал. Возможно, к нему привязаны сеансы."
             ),
         )
+
+# Удаление фильма (только если к нему нет сеансов)
+@router.delete("/api/movies/{movie_id}")
+async def delete_movie(
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    movie = await db.get(Movies, movie_id)
+    if movie is None:
+        raise HTTPException(status_code=404, detail="Фильм не найден")
+
+    result_session = await db.execute(
+        select(MovieSession).filter_by(movie_id=movie_id)
+    )
+    existing_session = result_session.scalar_one_or_none()
+    if existing_session is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя удалить фильм: для него уже создан сеанс.",
+        )
+
+    await db.delete(movie)
+    await db.commit()
+    return {"status": "success", "deleted_movie_id": movie_id}

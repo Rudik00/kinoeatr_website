@@ -75,3 +75,13 @@ async def halls_page():
 @app.get("/admin/halls/create")
 async def halls_create_page():
     return FileResponse("frontend/admin/creation_hall/index.html")
+
+
+@app.get("/admin/movies")
+async def movies_page():
+    return FileResponse("frontend/admin/movies/index.html")
+
+
+@app.get("/admin/movies/create")
+async def movies_create_page():
+    return FileResponse("frontend/admin/creation_movies/index.html")
