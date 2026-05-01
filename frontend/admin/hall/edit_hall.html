@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Edit Hall</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="/static/admin/hall/styles.css" />
+</head>
+<body>
+	<div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+	<div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+
+	<main class="layout">
+		<section class="panel panel-left">
+			<p class="eyebrow">Cinema Admin</p>
+			<h1>Edit Hall</h1>
+			<p class="lead">
+				Update hall structure row by row. The form is the same as creation.
+			</p>
+			<pre class="contract">{
+	"name": "Blue Hall",
+	"rows": [
+		{"row_number": 1, "seats_count": 12, "category": "standard"}
+	]
+}</pre>
+
+			<ul class="rules">
+				<li>row_number: 1..50</li>
+				<li>seats_count: 1..100</li>
+				<li>rows must have unique row_number</li>
+			</ul>
+		</section>
+
+		<section class="panel panel-right">
+			<header class="card-header">
+				<h2>Hall Configurator</h2>
+				<button id="add-row-btn" type="button" class="btn btn-secondary">+ Add Row</button>
+			</header>
+
+			<form id="hall-form" novalidate>
+				<div class="field">
+					<label for="hall-name">Hall Name</label>
+					<input id="hall-name" name="hall-name" type="text" maxlength="100" placeholder="Example: Emerald Hall" required />
+				</div>
+
+				<div id="rows-container" class="rows-container"></div>
+
+				<footer class="form-footer">
+					<button id="submit-btn" type="submit" class="btn btn-primary">Save Hall</button>
+					<button id="reset-btn" type="button" class="btn btn-ghost">Reset</button>
+				</footer>
+			</form>
+
+			<section class="result-box">
+				<h3>Response</h3>
+				<pre id="result-output">Loading hall...</pre>
+			</section>
+		</section>
+	</main>
+
+	<template id="row-template">
+		<article class="row-card">
+			<div class="row-title-wrap">
+				<h4>Row <span class="row-index"></span></h4>
+				<button type="button" class="remove-row-btn" aria-label="Remove row">Remove</button>
+			</div>
+
+			<div class="row-grid">
+				<div class="field">
+					<label>Row Number</label>
+					<input class="row-number" type="number" min="1" max="50" required />
+				</div>
+
+				<div class="field">
+					<label>Seats Count</label>
+					<input class="seats-count" type="number" min="1" max="100" required />
+				</div>
+
+				<div class="field">
+					<label>Category</label>
+					<select class="row-category">
+						<option value="standard">standard</option>
+						<option value="vip">vip</option>
+						<option value="economy">economy</option>
+						<option value="couple">couple</option>
+					</select>
+				</div>
+			</div>
+		</article>
+	</template>
+
+	<script src="/static/admin/hall/edit_app.js" defer></script>
+</body>
+</html>

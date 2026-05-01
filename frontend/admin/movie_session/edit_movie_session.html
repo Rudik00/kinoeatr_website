@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Редактирование Сеанса</title>
+	<style>
+		:root {
+			--bg: #f5f7fb;
+			--ink: #10213a;
+			--muted: #5f728f;
+			--line: #dbe3ef;
+			--panel: #ffffff;
+			--accent: #0e7490;
+			--accent-hover: #0c5f76;
+			--danger: #b91c1c;
+			--ok: #0f766e;
+		}
+
+		* { box-sizing: border-box; }
+
+		body {
+			margin: 0;
+			font-family: "Segoe UI", Tahoma, sans-serif;
+			color: var(--ink);
+			background: radial-gradient(circle at 10% 0%, #e0f2fe 0%, transparent 42%),
+									radial-gradient(circle at 90% 100%, #d1fae5 0%, transparent 40%),
+									var(--bg);
+		}
+
+		.wrap {
+			max-width: 920px;
+			margin: 28px auto;
+			padding: 0 16px;
+		}
+
+		.topbar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 18px;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: clamp(24px, 4vw, 34px);
+			letter-spacing: 0.01em;
+		}
+
+		.btn {
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			padding: 10px 14px;
+			text-decoration: none;
+			font-weight: 600;
+			color: var(--ink);
+			background: #fff;
+			cursor: pointer;
+		}
+
+		.panel {
+			background: var(--panel);
+			border: 1px solid var(--line);
+			border-radius: 16px;
+			box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+			overflow: hidden;
+		}
+
+		.panel-head {
+			padding: 14px 16px;
+			border-bottom: 1px solid var(--line);
+			background: #f8fafc;
+			color: var(--muted);
+			font-size: 14px;
+		}
+
+		form {
+			padding: 16px;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 14px;
+		}
+
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: 7px;
+		}
+
+		label {
+			font-size: 13px;
+			color: var(--muted);
+			font-weight: 600;
+		}
+
+		select,
+		input {
+			width: 100%;
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			padding: 10px 12px;
+			font-size: 15px;
+			outline: none;
+			background: #fff;
+		}
+
+		select:focus,
+		input:focus {
+			border-color: #7dd3fc;
+			box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+		}
+
+		.actions {
+			grid-column: 1 / -1;
+			display: flex;
+			gap: 10px;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+		}
+
+		.btn-primary {
+			border: 0;
+			background: var(--accent);
+			color: #fff;
+		}
+
+		.btn-primary:hover {
+			background: var(--accent-hover);
+		}
+
+		.status {
+			margin: 12px 16px 18px;
+			padding: 10px 12px;
+			border-radius: 10px;
+			font-size: 13px;
+			display: none;
+			white-space: pre-wrap;
+		}
+
+		.status.ok {
+			display: block;
+			color: var(--ok);
+			border: 1px solid #a7f3d0;
+			background: #ecfdf5;
+		}
+
+		.status.error {
+			display: block;
+			color: var(--danger);
+			border: 1px solid #fecaca;
+			background: #fef2f2;
+		}
+
+		@media (max-width: 760px) {
+			form {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<div class="topbar">
+			<h1>Редактирование Сеанса</h1>
+			<a class="btn" href="/admin/sessions">Назад к списку</a>
+		</div>
+
+		<section class="panel">
+			<div class="panel-head">Выбери фильм, зал, дату и цену и сохрани изменения</div>
+
+			<form id="session-form">
+				<div class="field">
+					<label for="movie_id">Фильм</label>
+					<select id="movie_id" name="movie_id" required>
+						<option value="">Выбери фильм...</option>
+					</select>
+				</div>
+
+				<div class="field">
+					<label for="hall_id">Зал</label>
+					<select id="hall_id" name="hall_id" required>
+						<option value="">Выбери зал...</option>
+					</select>
+				</div>
+
+				<div class="field">
+					<label for="starts_at">Дата и время</label>
+					<input id="starts_at" name="starts_at" type="datetime-local" required />
+				</div>
+
+				<div class="field">
+					<label for="base_price">Базовая цена билета</label>
+					<input id="base_price" name="base_price" type="number" min="1" step="1" required />
+				</div>
+
+				<div class="actions">
+					<button class="btn" type="button" id="reload-btn">Сбросить изменения</button>
+					<button id="submit-btn" class="btn btn-primary" type="submit">Сохранить сеанс</button>
+				</div>
+			</form>
+
+			<div id="status" class="status"></div>
+		</section>
+	</div>
+
+	<script>
+		const API = {
+			loginPage: "/admin/login",
+			me: "/admin/api/me",
+			movies: "/admin/api/movies",
+			halls: "/admin/api/halls",
+			sessions: "/admin/api/sessions",
+			editSession: (id) => `/admin/api/sessions_edit/${id}`,
+		};
+
+		const params = new URLSearchParams(window.location.search);
+		const sessionId = Number(params.get("id"));
+
+		const form = document.getElementById("session-form");
+		const movieSelect = document.getElementById("movie_id");
+		const hallSelect = document.getElementById("hall_id");
+		const statusBox = document.getElementById("status");
+		const submitBtn = document.getElementById("submit-btn");
+		const reloadBtn = document.getElementById("reload-btn");
+
+		function token() {
+			return localStorage.getItem("admin_token");
+		}
+
+		function setStatus(message, kind) {
+			statusBox.className = `status ${kind}`;
+			statusBox.textContent = message;
+		}
+
+		function clearStatus() {
+			statusBox.className = "status";
+			statusBox.textContent = "";
+		}
+
+		async function ensureAdmin() {
+			const t = token();
+			if (!t) {
+				window.location.href = API.loginPage;
+				return false;
+			}
+
+			try {
+				const meResp = await fetch(API.me, {
+					headers: { Authorization: `Bearer ${t}` },
+				});
+				if (!meResp.ok) {
+					localStorage.removeItem("admin_token");
+					window.location.href = API.loginPage;
+					return false;
+				}
+			} catch {
+				setStatus("Не удалось проверить авторизацию.", "error");
+				return false;
+			}
+
+			return true;
+		}
+
+		function fillSelect(selectEl, items, valueKey, labelFn) {
+			const currentValue = selectEl.value;
+			const first = selectEl.options[0] ? selectEl.options[0].outerHTML : "";
+			selectEl.innerHTML = first;
+
+			for (const item of items) {
+				const option = document.createElement("option");
+				option.value = String(item[valueKey]);
+				option.textContent = labelFn(item);
+				selectEl.appendChild(option);
+			}
+
+			if (currentValue) {
+				selectEl.value = currentValue;
+			}
+		}
+
+		function toDatetimeLocal(isoValue) {
+			if (!isoValue) return "";
+			const date = new Date(isoValue);
+			if (Number.isNaN(date.getTime())) return "";
+			const pad = (n) => String(n).padStart(2, "0");
+			return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+		}
+
+		async function loadDataAndFill() {
+			const t = token();
+			if (!t) return;
+
+			if (!Number.isInteger(sessionId) || sessionId <= 0) {
+				setStatus("Некорректный id сеанса в ссылке.", "error");
+				return;
+			}
+
+			try {
+				const [moviesResp, hallsResp, sessionsResp] = await Promise.all([
+					fetch(API.movies, { headers: { Authorization: `Bearer ${t}` } }),
+					fetch(API.halls, { headers: { Authorization: `Bearer ${t}` } }),
+					fetch(API.sessions, { headers: { Authorization: `Bearer ${t}` } }),
+				]);
+
+				if (!moviesResp.ok || !hallsResp.ok || !sessionsResp.ok) {
+					setStatus("Не удалось загрузить данные для редактирования.", "error");
+					return;
+				}
+
+				const moviesPayload = await moviesResp.json();
+				const hallsPayload = await hallsResp.json();
+				const sessionsPayload = await sessionsResp.json();
+
+				const movies = Array.isArray(moviesPayload.movies) ? moviesPayload.movies : [];
+				const halls = Array.isArray(hallsPayload.halls) ? hallsPayload.halls : [];
+				const sessions = Array.isArray(sessionsPayload.sessions) ? sessionsPayload.sessions : [];
+
+				fillSelect(movieSelect, movies, "id", (movie) => `${movie.name} (ID: ${movie.id})`);
+				fillSelect(hallSelect, halls, "id", (hall) => `${hall.name ?? hall.name_hall ?? "Зал"} (ID: ${hall.id})`);
+
+				const session = sessions.find((s) => Number(s.id) === sessionId);
+				if (!session) {
+					setStatus("Сеанс не найден.", "error");
+					return;
+				}
+
+				movieSelect.value = String(session.movie_id ?? "");
+				hallSelect.value = String(session.hall_id ?? "");
+				document.getElementById("starts_at").value = toDatetimeLocal(session.starts_at);
+				document.getElementById("base_price").value = session.base_price ?? "";
+
+				setStatus(`Загружен сеанс #${sessionId}`, "ok");
+			} catch {
+				setStatus("Сервер недоступен.", "error");
+			}
+		}
+
+		function payloadFromForm() {
+			const fd = new FormData(form);
+			return {
+				movie_id: Number(fd.get("movie_id")),
+				hall_id: Number(fd.get("hall_id")),
+				starts_at: String(fd.get("starts_at") || ""),
+				base_price: Number(fd.get("base_price")),
+			};
+		}
+
+		async function onSubmit(event) {
+			event.preventDefault();
+			clearStatus();
+
+			const t = token();
+			if (!t) {
+				window.location.href = API.loginPage;
+				return;
+			}
+
+			const payload = payloadFromForm();
+			submitBtn.disabled = true;
+
+			try {
+				const resp = await fetch(API.editSession(sessionId), {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${t}`,
+					},
+					body: JSON.stringify(payload),
+				});
+
+				const data = await resp.json().catch(() => null);
+				if (!resp.ok) {
+					const msg = data && data.detail ? data.detail : `Ошибка: ${resp.status}`;
+					setStatus(String(msg), "error");
+					return;
+				}
+
+				setStatus("Сеанс успешно обновлен.", "ok");
+				setTimeout(() => { window.location.href = "/admin/sessions"; }, 800);
+			} catch {
+				setStatus("Сервер недоступен.", "error");
+			} finally {
+				submitBtn.disabled = false;
+			}
+		}
+
+		reloadBtn.addEventListener("click", loadDataAndFill);
+		form.addEventListener("submit", onSubmit);
+
+		(async function init() {
+			const ok = await ensureAdmin();
+			if (!ok) return;
+			await loadDataAndFill();
+		})();
+	</script>
+</body>
+</html>

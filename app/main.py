@@ -55,7 +55,7 @@ async def validation_error_handler(
 
         if code.startswith("MOVIE_"):
             return handle_movie_create_errors(code)
-        
+
         if code.startswith("SESSION_"):
             return handle_session_create_errors(code)
 
@@ -77,33 +77,50 @@ async def dashboard_page():
 
 @app.get("/admin/halls")
 async def halls_page():
-    return FileResponse("frontend/admin/output_halls/output_halls.html")
+    return FileResponse("frontend/admin/hall/output_halls.html")
 
 
 @app.get("/admin/halls/create")
 async def halls_create_page():
-    return FileResponse("frontend/admin/creation_hall/creation_hall.html")
+    return FileResponse("frontend/admin/hall/creation_hall.html")
+
+
+@app.get("/admin/halls/edit")
+async def halls_edit_page():
+    return FileResponse("frontend/admin/hall/edit_hall.html")
 
 
 @app.get("/admin/movies")
 async def movies_page():
-    return FileResponse("frontend/admin/output_movies/output_movies.html")
+    return FileResponse("frontend/admin/movies/output_movies.html")
 
 
 @app.get("/admin/movies/create")
 async def movies_create_page():
-    return FileResponse("frontend/admin/creation_movies/creation_movies.html")
+    return FileResponse("frontend/admin/movies/creation_movies.html")
+
+
+@app.get("/admin/movies/edit")
+async def movies_edit_page():
+    return FileResponse("frontend/admin/movies/edit_movies.html")
 
 
 @app.get("/admin/sessions")
 async def sessions_page():
     return FileResponse(
-        "frontend/admin/output_movie_session/output_movie_session.html"
+        "frontend/admin/movie_session/output_movie_session.html"
     )
 
 
 @app.get("/admin/sessions/create")
 async def sessions_create_page():
     return FileResponse(
-        "frontend/admin/creation_movie_session/creation_movie_session.html"
+        "frontend/admin/movie_session/creation_movie_session.html"
+    )
+
+
+@app.get("/admin/sessions/edit")
+async def sessions_edit_page():
+    return FileResponse(
+        "frontend/admin/movie_session/edit_movie_session.html"
     )

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Редактирование фильма</title>
+	<style>
+		:root {
+			--bg: #f5f7fb;
+			--ink: #10213a;
+			--muted: #5f728f;
+			--line: #dbe3ef;
+			--panel: #ffffff;
+			--accent: #0e7490;
+			--accent-hover: #0c5f76;
+			--danger: #b91c1c;
+			--ok: #0f766e;
+		}
+
+		* { box-sizing: border-box; }
+
+		body {
+			margin: 0;
+			font-family: "Segoe UI", Tahoma, sans-serif;
+			color: var(--ink);
+			background: radial-gradient(circle at 10% 0%, #e0f2fe 0%, transparent 42%),
+									radial-gradient(circle at 90% 100%, #d1fae5 0%, transparent 40%),
+									var(--bg);
+		}
+
+		.wrap {
+			max-width: 920px;
+			margin: 28px auto;
+			padding: 0 16px;
+		}
+
+		.topbar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 18px;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: clamp(24px, 4vw, 34px);
+			letter-spacing: 0.01em;
+		}
+
+		.btn {
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			padding: 10px 14px;
+			text-decoration: none;
+			font-weight: 600;
+			color: var(--ink);
+			background: #fff;
+			cursor: pointer;
+		}
+
+		.panel {
+			background: var(--panel);
+			border: 1px solid var(--line);
+			border-radius: 16px;
+			box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+			overflow: hidden;
+		}
+
+		.panel-head {
+			padding: 14px 16px;
+			border-bottom: 1px solid var(--line);
+			background: #f8fafc;
+			color: var(--muted);
+			font-size: 14px;
+		}
+
+		form {
+			padding: 16px;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 14px;
+		}
+
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: 7px;
+		}
+
+		.field.full {
+			grid-column: 1 / -1;
+		}
+
+		label {
+			font-size: 13px;
+			color: var(--muted);
+			font-weight: 600;
+		}
+
+		input,
+		textarea {
+			width: 100%;
+			border: 1px solid var(--line);
+			border-radius: 10px;
+			padding: 10px 12px;
+			font-size: 15px;
+			outline: none;
+		}
+
+		textarea {
+			min-height: 120px;
+			resize: vertical;
+			font-family: inherit;
+		}
+
+		input:focus,
+		textarea:focus {
+			border-color: #7dd3fc;
+			box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+		}
+
+		.actions {
+			grid-column: 1 / -1;
+			display: flex;
+			gap: 10px;
+			justify-content: flex-end;
+			flex-wrap: wrap;
+		}
+
+		.btn-primary {
+			border: 0;
+			background: var(--accent);
+			color: #fff;
+		}
+
+		.btn-primary:hover {
+			background: var(--accent-hover);
+		}
+
+		.status {
+			margin: 12px 16px 18px;
+			padding: 10px 12px;
+			border-radius: 10px;
+			font-size: 13px;
+			display: none;
+			white-space: pre-wrap;
+		}
+
+		.status.ok {
+			display: block;
+			color: var(--ok);
+			border: 1px solid #a7f3d0;
+			background: #ecfdf5;
+		}
+
+		.status.error {
+			display: block;
+			color: var(--danger);
+			border: 1px solid #fecaca;
+			background: #fef2f2;
+		}
+
+		@media (max-width: 760px) {
+			form {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<div class="topbar">
+			<h1>Редактирование Фильма</h1>
+			<a class="btn" href="/admin/movies">Назад к списку</a>
+		</div>
+
+		<section class="panel">
+			<div class="panel-head">Измени поля фильма и сохрани</div>
+
+			<form id="movie-form">
+				<div class="field">
+					<label for="name">Название</label>
+					<input id="name" name="name" type="text" maxlength="160" required />
+				</div>
+
+				<div class="field">
+					<label for="duration">Длительность (минуты)</label>
+					<input id="duration" name="duration" type="number" min="1" max="600" required />
+				</div>
+
+				<div class="field">
+					<label for="release_date">Дата релиза</label>
+					<input id="release_date" name="release_date" type="date" required />
+				</div>
+
+				<div class="field">
+					<label for="preview_foto">Ссылка на постер</label>
+					<input id="preview_foto" name="preview_foto" type="url" placeholder="https://..." required />
+				</div>
+
+				<div class="field full">
+					<label for="description">Описание</label>
+					<textarea id="description" name="description" required></textarea>
+				</div>
+
+				<div class="actions">
+					<button class="btn" type="button" id="reload-btn">Сбросить изменения</button>
+					<button id="submit-btn" class="btn btn-primary" type="submit">Сохранить фильм</button>
+				</div>
+			</form>
+
+			<div id="status" class="status"></div>
+		</section>
+	</div>
+
+	<script>
+		const API = {
+			loginPage: "/admin/login",
+			me: "/admin/api/me",
+			movies: "/admin/api/movies",
+			editMovie: (id) => `/admin/api/movies_edit/${id}`,
+		};
+
+		const params = new URLSearchParams(window.location.search);
+		const movieId = Number(params.get("id"));
+
+		const form = document.getElementById("movie-form");
+		const statusBox = document.getElementById("status");
+		const submitBtn = document.getElementById("submit-btn");
+		const reloadBtn = document.getElementById("reload-btn");
+
+		function token() {
+			return localStorage.getItem("admin_token");
+		}
+
+		function setStatus(message, kind) {
+			statusBox.className = `status ${kind}`;
+			statusBox.textContent = message;
+		}
+
+		function clearStatus() {
+			statusBox.className = "status";
+			statusBox.textContent = "";
+		}
+
+		async function ensureAdmin() {
+			const t = token();
+			if (!t) {
+				window.location.href = API.loginPage;
+				return false;
+			}
+
+			try {
+				const meResp = await fetch(API.me, {
+					headers: { Authorization: `Bearer ${t}` },
+				});
+				if (!meResp.ok) {
+					localStorage.removeItem("admin_token");
+					window.location.href = API.loginPage;
+					return false;
+				}
+			} catch {
+				setStatus("Не удалось проверить авторизацию.", "error");
+				return false;
+			}
+
+			return true;
+		}
+
+		function payloadFromForm() {
+			const fd = new FormData(form);
+			return {
+				name: String(fd.get("name") || "").trim(),
+				duration: Number(fd.get("duration")),
+				description: String(fd.get("description") || "").trim(),
+				release_date: String(fd.get("release_date") || "").trim(),
+				preview_foto: String(fd.get("preview_foto") || "").trim(),
+			};
+		}
+
+		function fillMovie(movie) {
+			document.getElementById("name").value = movie.name || "";
+			document.getElementById("duration").value = movie.duration || "";
+			document.getElementById("release_date").value = movie.release_date || "";
+			document.getElementById("preview_foto").value = movie.preview_foto || "";
+			document.getElementById("description").value = movie.description || "";
+		}
+
+		async function loadMovie() {
+			const t = token();
+			if (!t) return;
+
+			if (!Number.isInteger(movieId) || movieId <= 0) {
+				setStatus("Некорректный id фильма в ссылке.", "error");
+				return;
+			}
+
+			try {
+				const resp = await fetch(API.movies, {
+					headers: { Authorization: `Bearer ${t}` },
+				});
+				if (!resp.ok) {
+					setStatus("Не удалось загрузить фильмы.", "error");
+					return;
+				}
+
+				const payload = await resp.json();
+				const movies = Array.isArray(payload.movies) ? payload.movies : [];
+				const movie = movies.find((m) => Number(m.id) === movieId);
+				if (!movie) {
+					setStatus("Фильм не найден.", "error");
+					return;
+				}
+
+				fillMovie(movie);
+				setStatus(`Загружен фильм #${movieId}`, "ok");
+			} catch {
+				setStatus("Сервер недоступен.", "error");
+			}
+		}
+
+		async function onSubmit(event) {
+			event.preventDefault();
+			clearStatus();
+
+			const t = token();
+			if (!t) {
+				window.location.href = API.loginPage;
+				return;
+			}
+
+			const payload = payloadFromForm();
+			submitBtn.disabled = true;
+
+			try {
+				const resp = await fetch(API.editMovie(movieId), {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${t}`,
+					},
+					body: JSON.stringify(payload),
+				});
+
+				const data = await resp.json().catch(() => null);
+				if (!resp.ok) {
+					const msg = data && data.detail ? data.detail : `Ошибка: ${resp.status}`;
+					setStatus(String(msg), "error");
+					return;
+				}
+
+				setStatus("Фильм успешно обновлен.", "ok");
+				setTimeout(() => { window.location.href = "/admin/movies"; }, 800);
+			} catch {
+				setStatus("Сервер недоступен.", "error");
+			} finally {
+				submitBtn.disabled = false;
+			}
+		}
+
+		reloadBtn.addEventListener("click", loadMovie);
+		form.addEventListener("submit", onSubmit);
+
+		(async function init() {
+			const ok = await ensureAdmin();
+			if (!ok) return;
+			await loadMovie();
+		})();
+	</script>
+</body>
+</html>

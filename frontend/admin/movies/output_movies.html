@@ -142,8 +142,38 @@
 		}
 
 		.actions-col {
-			width: 88px;
+			width: 132px;
 			text-align: right;
+		}
+
+		.actions-wrap {
+			display: inline-flex;
+			align-items: center;
+			justify-content: flex-end;
+			gap: 8px;
+		}
+
+		.edit-btn {
+			border: 1px solid #bfdbfe;
+			background: #eff6ff;
+			color: #1d4ed8;
+			width: 36px;
+			height: 36px;
+			border-radius: 10px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+		}
+
+		.edit-btn:hover {
+			background: #dbeafe;
+		}
+
+		.edit-btn svg {
+			width: 18px;
+			height: 18px;
+			fill: currentColor;
 		}
 
 		.delete-btn {
@@ -218,7 +248,7 @@
 							<th>Мин</th>
 							<th>Дата релиза</th>
 							<th>Описание</th>
-							<th class="actions-col">Удалить</th>
+							<th class="actions-col">Действия</th>
 						</tr>
 					</thead>
 					<tbody id="movies-body"></tbody>
@@ -283,11 +313,18 @@
 					<td>${movie.release_date ?? "-"}</td>
 					<td class="desc">${movie.description ?? "-"}</td>
 					<td class="actions-col">
-						<button class="delete-btn" type="button" data-movie-id="${movie.id}" aria-label="Удалить фильм">
-							<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-								<path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-2 2h8v12H8V7zm2 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1z"/>
-							</svg>
-						</button>
+						<div class="actions-wrap">
+							<button class="edit-btn" type="button" data-edit-movie-id="${movie.id}" aria-label="Редактировать фильм">
+								<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+									<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.13 1.13 3.75 3.75 1.13-1.13z"/>
+								</svg>
+							</button>
+							<button class="delete-btn" type="button" data-delete-movie-id="${movie.id}" aria-label="Удалить фильм">
+								<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+									<path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-2 2h8v12H8V7zm2 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1z"/>
+								</svg>
+							</button>
+						</div>
 					</td>
 				`;
 				moviesBody.appendChild(tr);
@@ -374,9 +411,18 @@
 		}
 
 		moviesBody.addEventListener("click", (event) => {
-			const button = event.target.closest("[data-movie-id]");
-			if (!button) return;
-			const movieId = Number(button.dataset.movieId);
+			const editButton = event.target.closest("[data-edit-movie-id]");
+			if (editButton) {
+				const movieId = Number(editButton.dataset.editMovieId);
+				if (Number.isInteger(movieId)) {
+					window.location.href = `/admin/movies/edit?id=${movieId}`;
+				}
+				return;
+			}
+
+			const deleteButton = event.target.closest("[data-delete-movie-id]");
+			if (!deleteButton) return;
+			const movieId = Number(deleteButton.dataset.deleteMovieId);
 			if (!Number.isInteger(movieId)) return;
 			deleteMovie(movieId);
 		});

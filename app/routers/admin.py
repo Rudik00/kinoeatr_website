@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from typing import List
 
 from ..db import get_db
@@ -505,6 +505,51 @@ async def list_cinema_halls(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/api/halls/{hall_id}")
+async def get_cinema_hall(
+    hall_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    hall = await db.get(CinemaHall, hall_id)
+    if hall is None:
+        raise RequestValidationError(
+            errors=[
+                {
+                    "msg": "HALL_NOT_FOUND",
+                    "loc": (),
+                    "type": "value_error",
+                }
+            ]
+        )
+
+    seats = (
+        await db.execute(
+            select(HallSeat)
+            .filter_by(hall_id=hall_id)
+            .order_by(HallSeat.seat_row.asc(), HallSeat.seat_number.asc())
+        )
+    ).scalars().all()
+
+    rows_map = {}
+    for seat in seats:
+        if seat.seat_row not in rows_map:
+            rows_map[seat.seat_row] = {
+                "row_number": seat.seat_row,
+                "seats_count": 0,
+                "category": seat.category,
+            }
+        rows_map[seat.seat_row]["seats_count"] += 1
+
+    rows = [rows_map[key] for key in sorted(rows_map.keys())]
+
+    return {
+        "id": hall.id,
+        "name": hall.name_hall,
+        "rows": rows,
+    }
+
+
 # ____________________________________________________________________________________________
 #                                      3.2 - ФИЛЬМ
 # ____________________________________________________________________________________________
@@ -571,19 +616,353 @@ async def list_movie_sessions(
 # ____________________________________________________________________________________________
 #                                      4.1 - ЗАЛ
 # ____________________________________________________________________________________________
+# 1. Валидация конкретного ряда
+class EditRowConfig(BaseModel):
+    row_number: int
+    seats_count: int
+    category: str = "standard"
 
+    @field_validator("row_number")
+    @classmethod
+    def validate_row_number(cls, v):
+        if v <= 0 or v > 50:
+            raise ValueError("ROW_NUMBER_INVALID")
+        return v
+
+    @field_validator("seats_count")
+    @classmethod
+    def validate_seats_count(cls, v):
+        if v <= 0 or v > 100:
+            raise ValueError("SEATS_COUNT_INVALID")
+        return v
+
+
+# 2. Валидация всего запроса на редактирование зала
+class HallEdit(BaseModel):
+    name: str
+    rows: List[EditRowConfig]
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        if not v.strip() or len(v) > 100:
+            raise ValueError("HALL_NAME_INVALID")
+        return v.strip()
+
+    @field_validator("rows")
+    @classmethod
+    def validate_rows(cls, v):
+        if not v:
+            raise ValueError("HALL_ROWS_EMPTY")
+        # Проверка на дубликаты номеров рядов
+        row_numbers = [r.row_number for r in v]
+        if len(row_numbers) != len(set(row_numbers)):
+            raise ValueError("DUPLICATE_ROW_NUMBERS")
+        return v
+
+
+# 3. Эндпоинт (с учетом асинхронности)
+@router.put("/api/halls_edit/{hall_id}")
+async def edit_cinema_hall(
+    hall_id: int,
+    hall_data: HallEdit,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    try:
+        hall = await db.get(CinemaHall, hall_id)
+        if hall is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "HALL_NOT_FOUND",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        existing_hall_with_name = (
+            await db.execute(
+                select(CinemaHall).filter_by(name_hall=hall_data.name)
+            )
+        ).scalar_one_or_none()
+        if (
+            existing_hall_with_name is not None
+            and existing_hall_with_name.id != hall_id
+        ):
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "HALL_NAME_EXISTS",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        hall.name_hall = hall_data.name
+
+        await db.execute(delete(HallSeat).where(HallSeat.hall_id == hall_id))
+
+        for row in hall_data.rows:
+            for seat_num in range(1, row.seats_count + 1):
+                seat = HallSeat(
+                    hall_id=hall_id,
+                    seat_row=row.row_number,
+                    seat_number=seat_num,
+                    category=row.category
+                )
+                db.add(seat)
+
+        await db.commit()
+        return {"status": "success", "hall_id": hall_id}
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, RequestValidationError):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ____________________________________________________________________________________________
 #                                      4.2 - ФИЛЬМ
 # ____________________________________________________________________________________________
+# Валидация данных фильма
+class MovieEdit(BaseModel):
+    name: str
+    duration: int
+    description: str
+    release_date: str
+    preview_foto: str
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        if not v.strip() or len(v) > 100:
+            raise ValueError("MOVIE_NAME_INVALID")
+        return v.strip()
+
+    @field_validator("duration")
+    @classmethod
+    def validate_duration(cls, v):
+        if v <= 0:
+            raise ValueError("MOVIE_DURATION_INVALID")
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v):
+        if not v.strip() or v.strip() == "":
+            raise ValueError("MOVIE_DESCRIPTION_EMPTY")
+        return v.strip()
+
+    @field_validator("release_date")
+    @classmethod
+    def validate_release_date(cls, v):
+        # Проверка даты с пособием datetime или regex
+        # Для простоты примем формат "YYYY-MM-DD"
+        try:
+            datetime.datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("MOVIE_RELEASE_DATE_INVALID")
+        return v.strip()
+
+    @field_validator("preview_foto")
+    @classmethod
+    def validate_preview_foto(cls, v):
+        if not v.strip() or v.strip() == "":
+            raise ValueError("MOVIE_PREVIEW_FOTO_EMPTY")
+        return v.strip()
+
+
+# Эндпоинт для редактирования фильма
+@router.put("/api/movies_edit/{movie_id}")
+async def edit_movie(
+    movie_id: int,
+    movie_data: MovieEdit,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    try:
+        movie = await db.get(Movies, movie_id)
+        if movie is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "MOVIE_NOT_FOUND",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        existing_movie_with_name = (
+            await db.execute(select(Movies).filter_by(name=movie_data.name))
+        ).scalar_one_or_none()
+        if (
+            existing_movie_with_name is not None
+            and existing_movie_with_name.id != movie_id
+        ):
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "MOVIE_NAME_EXISTS",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        movie.name = movie_data.name
+        movie.duration = movie_data.duration
+        movie.description = movie_data.description
+        movie.release_date = movie_data.release_date
+        movie.preview_foto = movie_data.preview_foto
+
+        await db.commit()
+        return {"status": "success", "movie_id": movie.id}
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, RequestValidationError):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ____________________________________________________________________________________________
 #                                      4.3 - СЕАНС
 # ____________________________________________________________________________________________
+class MovieSessionEdit(BaseModel):
+    movie_id: int
+    hall_id: int
+    starts_at: str
+    base_price: int
 
+    @field_validator("movie_id")
+    @classmethod
+    def validate_movie_id(cls, v):
+        if v <= 0:
+            raise ValueError("SESSION_MOVIE_ID_INVALID")
+        return v
+
+    @field_validator("hall_id")
+    @classmethod
+    def validate_hall_id(cls, v):
+        if v <= 0:
+            raise ValueError("SESSION_HALL_ID_INVALID")
+        return v
+
+    @field_validator("starts_at")
+    @classmethod
+    def validate_starts_at(cls, v):
+        value = v.strip()
+        if not value:
+            raise ValueError("SESSION_STARTS_AT_EMPTY")
+        try:
+            datetime.datetime.fromisoformat(value)
+        except ValueError:
+            raise ValueError("SESSION_STARTS_AT_INVALID")
+        return value
+
+    @field_validator("base_price")
+    @classmethod
+    def validate_base_price(cls, v):
+        if v <= 0:
+            raise ValueError("SESSION_BASE_PRICE_INVALID")
+        return v
+
+
+@router.put("/api/sessions_edit/{session_id}")
+async def edit_movie_session(
+    session_id: int,
+    session_data: MovieSessionEdit,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    try:
+        session = await db.get(MovieSession, session_id)
+        if session is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_NOT_FOUND",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        starts_at_dt = datetime.datetime.fromisoformat(session_data.starts_at)
+        if starts_at_dt <= datetime.datetime.now():
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_START_TIME_INVALID",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        movie = await db.get(Movies, session_data.movie_id)
+        if movie is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_MOVIE_ID_INVALID",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        hall = await db.get(CinemaHall, session_data.hall_id)
+        if hall is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_HALL_ID_INVALID",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        conflict = (
+            await db.execute(
+                select(MovieSession).where(
+                    MovieSession.hall_id == session_data.hall_id,
+                    MovieSession.starts_at == starts_at_dt,
+                    MovieSession.id != session_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if conflict is not None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_CONFLICT",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        session.movie_id = session_data.movie_id
+        session.hall_id = session_data.hall_id
+        session.starts_at = starts_at_dt
+        session.base_price = session_data.base_price
+
+        await db.commit()
+        await db.refresh(session)
+        return {"status": "success", "session_id": session.id}
+
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, RequestValidationError):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 ##############################################################################################
