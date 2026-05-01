@@ -37,6 +37,7 @@ def handle_movie_create_errors(code: str) -> JSONResponse:
         "MOVIE_RELEASE_DATE_INVALID": "Неверная дата релиза фильма",
         "MOVIE_PREVIEW_FOTO_EMPTY": "URL превью фотографии не может быть пустым",
         "MOVIE_NOT_FOUND": "Фильм не найден",
+        "MOVIE_DELETE_HAS_SESSIONS": "Нельзя удалить фильм: для него уже создан сеанс."
 
     }
     text = messages[code]
@@ -49,6 +50,7 @@ def handle_session_create_errors(code: str) -> JSONResponse:
         "SESSION_HALL_ID_INVALID": "Неверный ID зала",
         "SESSION_START_TIME_INVALID": "Неверное время начала сеанса",
         "SESSION_CONFLICT": "Сеанс конфликтует с уже существующим сеансом в этом зале",
+        "SESSION_NOT_FOUND": "Сеанс не найден",
     }
     text = messages[code]
     return JSONResponse(status_code=422, content={"detail": text})

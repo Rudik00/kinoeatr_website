@@ -75,6 +75,34 @@
 			border: 1px solid var(--line);
 		}
 
+		.actions-col {
+			width: 88px;
+			text-align: right;
+		}
+
+		.delete-btn {
+			border: 1px solid #fecaca;
+			background: #fff5f5;
+			color: var(--danger);
+			width: 36px;
+			height: 36px;
+			border-radius: 10px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+		}
+
+		.delete-btn:hover {
+			background: #fee2e2;
+		}
+
+		.delete-btn svg {
+			width: 18px;
+			height: 18px;
+			fill: currentColor;
+		}
+
 		.panel {
 			background: var(--panel);
 			border: 1px solid var(--line);
@@ -183,6 +211,7 @@
 							<th>Зал</th>
 							<th>Начало</th>
 							<th>Базовая цена</th>
+							<th class="actions-col">Удалить</th>
 						</tr>
 					</thead>
 					<tbody id="sessions-body"></tbody>
@@ -199,6 +228,7 @@
 		const API = {
 			me: "/admin/api/me",
 			sessions: "/admin/api/sessions",
+			deleteSession: (id) => `/admin/api/sessions/${id}`,
 			login: "/admin/login",
 		};
 
@@ -252,8 +282,56 @@
 					<td>${session.hall_name ?? session.hall_id ?? "-"}</td>
 					<td>${formatDateTime(session.starts_at)}</td>
 					<td>${session.base_price ?? "-"}</td>
+					<td class="actions-col">
+						<button class="delete-btn" type="button" data-delete-session-id="${session.id}" aria-label="Удалить сеанс">
+							<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+								<path d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9zm1 2h4v1h-4V5zm-2 2h8v12H8V7zm2 2a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1zm4 0a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0v-6a1 1 0 0 0-1-1z"/>
+							</svg>
+						</button>
+					</td>
 				`;
 				sessionsBody.appendChild(tr);
+			}
+		}
+
+		async function onDeleteSessionClick(event) {
+			const button = event.target.closest("[data-delete-session-id]");
+			if (!button) return;
+
+			const sessionId = Number(button.dataset.deleteSessionId);
+			if (!Number.isInteger(sessionId)) {
+				showError("Некорректный ID сеанса.");
+				return;
+			}
+
+			const confirmed = window.confirm(`Удалить сеанс #${sessionId}?`);
+			if (!confirmed) return;
+
+			const t = token();
+			if (!t) {
+				window.location.href = API.login;
+				return;
+			}
+
+			button.disabled = true;
+
+			try {
+				const response = await fetch(API.deleteSession(sessionId), {
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${t}` },
+				});
+
+				if (!response.ok) {
+					const text = await response.text();
+					showError(`Ошибка удаления сеанса: ${response.status}\n${text}`);
+					button.disabled = false;
+					return;
+				}
+
+				await loadSessions();
+			} catch {
+				showError("Сервер недоступен.");
+				button.disabled = false;
 			}
 		}
 
@@ -316,6 +394,7 @@
 		}
 
 		refreshBtn.addEventListener("click", loadSessions);
+		sessionsBody.addEventListener("click", onDeleteSessionClick);
 
 		(async function init() {
 			const ok = await ensureAdmin();

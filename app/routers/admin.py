@@ -63,6 +63,7 @@ def get_current_admin(
                     }
                 ]
             )
+        return payload
     except Exception as e:
         if isinstance(e, RequestValidationError):
             raise e
@@ -648,9 +649,14 @@ async def delete_movie(
         )
         existing_session = result_session.scalar_one_or_none()
         if existing_session is not None:
-            raise HTTPException(
-                status_code=400,
-                detail="Нельзя удалить фильм: для него уже создан сеанс.",
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "MOVIE_DELETE_HAS_SESSIONS",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
             )
 
         await db.delete(movie)
@@ -662,9 +668,52 @@ async def delete_movie(
             raise e
         raise HTTPException(status_code=400, detail=str(e))
 
+
 # ____________________________________________________________________________________________
 #                                      5.3 - СЕАНС
 # ____________________________________________________________________________________________
+
+@router.delete("/api/sessions/{session_id}")
+async def delete_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    try:
+        session = await db.get(MovieSession, session_id)
+        if session is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_NOT_FOUND",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+
+        result_session = await db.execute(
+            select(MovieSession).filter_by(id=session_id)
+        )
+        existing_session = result_session.scalar_one_or_none()
+        if existing_session is None:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "msg": "SESSION_NOT_FOUND",
+                        "loc": (),
+                        "type": "value_error",
+                    }
+                ]
+            )
+        await db.delete(session)
+        await db.commit()
+        return {"status": "success", "deleted_session_id": session_id}
+    except Exception as e:
+        await db.rollback()
+        if isinstance(e, RequestValidationError):
+            raise e
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 ##############################################################################################
