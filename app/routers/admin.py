@@ -624,6 +624,9 @@ async def list_bookings_for_session(
             ]
         )
 
+    movie = await db.get(Movies, session.movie_id)
+    movie_name = movie.name if movie is not None else None
+
     hall_seats = (
         await db.execute(select(HallSeat).filter_by(hall_id=session.hall_id))
     ).scalars().all()
@@ -685,6 +688,7 @@ async def list_bookings_for_session(
         "session": {
             "id": session.id,
             "movie_id": session.movie_id,
+            "movie_name": movie_name,
             "hall_id": session.hall_id,
             "starts_at": session.starts_at.isoformat(),
         },

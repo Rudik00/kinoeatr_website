@@ -307,7 +307,7 @@
       if (!row) return;
       const sessionId = Number(row.dataset.sessionId);
       if (!Number.isInteger(sessionId)) return;
-      window.location.href = `/bookings/${sessionId}`;
+      window.location.href = `/admin/bookings/${sessionId}`;
     });
 
     refreshBtn.addEventListener("click", loadSessions);

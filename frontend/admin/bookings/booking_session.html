@@ -154,7 +154,7 @@
   <div class="wrap">
     <div class="topbar">
       <h1 id="title">Бронирования Сеанса</h1>
-      <a class="btn" href="/bookings">Назад к сеансам</a>
+      <a class="btn" href="/admin/bookings">Назад к сеансам</a>
     </div>
 
     <section class="stats">
@@ -294,10 +294,11 @@
 
         const payload = await response.json();
         const bookings = Array.isArray(payload.bookings) ? payload.bookings : [];
+        const movieName = payload.session?.movie_name || `#${sessionId}`;
 
         document.getElementById("bookings-count").textContent = String(payload.bookings_count ?? bookings.length);
         document.getElementById("free-seats-count").textContent = String(payload.free_seats_count ?? 0);
-        document.getElementById("title").textContent = `Бронирования Сеанса #${sessionId}`;
+        document.getElementById("title").textContent = `Бронирования сеанса на фильм ${movieName}`;
 
         renderBookings(bookings);
       } catch {

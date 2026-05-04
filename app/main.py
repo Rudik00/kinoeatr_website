@@ -126,11 +126,11 @@ async def sessions_edit_page():
     )
 
 
-@app.get("/bookings")
+@app.get("/admin/bookings")
 async def bookings_page():
     return FileResponse("frontend/admin/bookings/bookings.html")
 
 
-@app.get("/bookings/{session_id}")
+@app.get("/admin/bookings/{session_id}")
 async def booking_detail_page(session_id: int):
     return FileResponse("frontend/admin/bookings/booking_session.html")
