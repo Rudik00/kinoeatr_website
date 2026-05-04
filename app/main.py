@@ -50,13 +50,13 @@ async def validation_error_handler(
         if code.startswith("ADMIN_LOGIN_"):
             return handle_admin_login_errors(code)
 
-        if code.startswith("HALL_"):
+        if code.startswith("ADMIN_HALL_"):
             return handle_hall_create_errors(code)
 
-        if code.startswith("MOVIE_"):
+        if code.startswith("ADMIN_MOVIE_"):
             return handle_movie_create_errors(code)
 
-        if code.startswith("SESSION_"):
+        if code.startswith("ADMIN_SESSION_"):
             return handle_session_create_errors(code)
 
     return JSONResponse(

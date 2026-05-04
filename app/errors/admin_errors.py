@@ -18,11 +18,11 @@ def handle_admin_login_errors(code: str) -> JSONResponse:
 
 def handle_hall_create_errors(code: str) -> JSONResponse:
     messages = {
-        "HALL_NAME_EMPTY": "Название зала не может быть пустым",
-        "HALL_SEAT_ROWS_INVALID": "Неверное количество рядов",
-        "HALL_SEAT_NUMBERS_PER_ROW_INVALID": "Неверное количество мест в ряду",
-        "HALL_NAME_EXISTS": "Зал с таким названием уже существует",
-        "HALL_NOT_FOUND": "Зал не найден",
+        "ADMIN_HALL_NAME_EMPTY": "Название зала не может быть пустым",
+        "ADMIN_HALL_SEAT_ROWS_INVALID": "Неверное количество рядов",
+        "ADMIN_HALL_SEAT_NUMBERS_PER_ROW_INVALID": "Неверное количество мест в ряду",
+        "ADMIN_HALL_NAME_EXISTS": "Зал с таким названием уже существует",
+        "ADMIN_HALL_NOT_FOUND": "Зал не найден",
 
     }
     text = messages[code]
@@ -31,13 +31,13 @@ def handle_hall_create_errors(code: str) -> JSONResponse:
 
 def handle_movie_create_errors(code: str) -> JSONResponse:
     messages = {
-        "MOVIE_NAME_EMPTY": "Название фильма не может быть пустым",
-        "MOVIE_DURATION_INVALID": "Неверная продолжительность фильма",
-        "MOVIE_DESCRIPTION_EMPTY": "Описание фильма не может быть пустым",
-        "MOVIE_RELEASE_DATE_INVALID": "Неверная дата релиза фильма",
-        "MOVIE_PREVIEW_FOTO_EMPTY": "URL превью фотографии не может быть пустым",
-        "MOVIE_NOT_FOUND": "Фильм не найден",
-        "MOVIE_DELETE_HAS_SESSIONS": "Нельзя удалить фильм: для него уже создан сеанс."
+        "ADMIN_MOVIE_NAME_EMPTY": "Название фильма не может быть пустым",
+        "ADMIN_MOVIE_DURATION_INVALID": "Неверная продолжительность фильма",
+        "ADMIN_MOVIE_DESCRIPTION_EMPTY": "Описание фильма не может быть пустым",
+        "ADMIN_MOVIE_RELEASE_DATE_INVALID": "Неверная дата релиза фильма",
+        "ADMIN_MOVIE_PREVIEW_FOTO_EMPTY": "URL превью фотографии не может быть пустым",
+        "ADMIN_MOVIE_NOT_FOUND": "Фильм не найден",
+        "ADMIN_MOVIE_DELETE_HAS_SESSIONS": "Нельзя удалить фильм: для него уже создан сеанс."
 
     }
     text = messages[code]
@@ -46,11 +46,11 @@ def handle_movie_create_errors(code: str) -> JSONResponse:
 
 def handle_session_create_errors(code: str) -> JSONResponse:
     messages = {
-        "SESSION_MOVIE_ID_INVALID": "Неверный ID фильма",
-        "SESSION_HALL_ID_INVALID": "Неверный ID зала",
-        "SESSION_START_TIME_INVALID": "Неверное время начала сеанса",
-        "SESSION_CONFLICT": "Сеанс конфликтует с уже существующим сеансом в этом зале",
-        "SESSION_NOT_FOUND": "Сеанс не найден",
+        "ADMIN_SESSION_MOVIE_ID_INVALID": "Неверный ID фильма",
+        "ADMIN_SESSION_HALL_ID_INVALID": "Неверный ID зала",
+        "ADMIN_SESSION_START_TIME_INVALID": "Неверное время начала сеанса",
+        "ADMIN_SESSION_CONFLICT": "Сеанс конфликтует с уже существующим сеансом в этом зале",
+        "ADMIN_SESSION_NOT_FOUND": "Сеанс не найден",
     }
     text = messages[code]
     return JSONResponse(status_code=422, content={"detail": text})
