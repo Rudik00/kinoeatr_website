@@ -14,6 +14,7 @@ from .errors.admin_errors import (
 
 # роутеры
 from .routers.admin import router as admin_router
+from .routers.movies import router as movies_router
 
 # база данных
 from .database.create_db import init_db
@@ -34,8 +35,11 @@ app = FastAPI(title="Cinema Reservation API", lifespan=lifespan)
 # статические файлы (фронтенд)
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
-# роутеры
+# роутеры для админа
 app.include_router(admin_router)
+
+# роуты для пользователей
+app.include_router(movies_router)
 
 
 @app.exception_handler(RequestValidationError)
@@ -64,7 +68,8 @@ async def validation_error_handler(
         content={"detail": "Ошибка валидации"},
     )
 
-
+################################################################
+#                                       РОУТЫ ДЛЯ АДМИНА
 @app.get("/admin/login")
 async def login_page():
     return FileResponse("frontend/admin/admin_login.html")
@@ -134,3 +139,10 @@ async def bookings_page():
 @app.get("/admin/bookings/{session_id}")
 async def booking_detail_page(session_id: int):
     return FileResponse("frontend/admin/bookings/booking_session.html")
+
+
+################################################################
+#                                      РОУТЫ ДЛЯ ПОЛЬЗОВАТЕЛЯ
+@app.get("/movies")
+async def home_page():
+    return FileResponse("frontend/users/home_page.html")

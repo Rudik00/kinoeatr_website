@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кинотеатр — Фильмы</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        /* Шапка */
+        header {
+            background: #1a1a2e;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2d2d5e;
+        }
+
+        header h1 {
+            font-size: 22px;
+            color: #a5b4fc;
+            letter-spacing: 1px;
+        }
+
+        header nav a {
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-left: 24px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        header nav a:hover { color: #a5b4fc; }
+
+        /* Основной контент */
+        main {
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #a5b4fc;
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+
+        /* Сетка фильмов */
+        .movies-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 24px;
+        }
+
+        /* Карточка фильма */
+        .movie-card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(79, 70, 229, 0.4);
+        }
+
+        .movie-card img {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            object-fit: cover;
+            display: block;
+            background: #2d2d5e;
+        }
+
+        .movie-card .no-photo {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            background: #2d2d5e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .movie-card .info {
+            padding: 12px;
+        }
+
+        .movie-card .title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f1f5f9;
+            line-height: 1.4;
+            margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .movie-card .duration {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        /* Состояния загрузки и ошибки */
+        .state-msg {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #2d2d5e;
+            border-top-color: #a5b4fc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🎬 Кинотеатр</h1>
+    <nav>
+        <a href="/home_page">Фильмы</a>
+        <a href="/login">Войти</a>
+    </nav>
+</header>
+
+<main>
+    <div class="section-title">Все фильмы</div>
+    <div id="movies-container">
+        <div class="state-msg">
+            <div class="spinner"></div>
+            Загружаем фильмы...
+        </div>
+    </div>
+</main>
+
+<script>
+    async function loadMovies() {
+        const container = document.getElementById("movies-container");
+
+        try {
+            const res = await fetch("/api/movies");
+            if (!res.ok) throw new Error("Ошибка сервера");
+            const data = await res.json();
+
+            if (!data.movies || data.movies.length === 0) {
+                container.innerHTML = `<div class="state-msg">Фильмов пока нет</div>`;
+                return;
+            }
+
+            const grid = document.createElement("div");
+            grid.className = "movies-grid";
+
+            for (const movie of data.movies) {
+                const card = document.createElement("a");
+                card.className = "movie-card";
+                card.href = `/movie/${movie.id}`;
+
+                const photoHtml = movie.preview_foto
+                    ? `<img src="${movie.preview_foto}" alt="${movie.name}" loading="lazy">`
+                    : `<div class="no-photo">Нет фото</div>`;
+
+                const durationHtml = movie.duration
+                    ? `<div class="duration">${movie.duration} мин</div>`
+                    : "";
+
+                card.innerHTML = `
+                    ${photoHtml}
+                    <div class="info">
+                        <div class="title">${movie.name}</div>
+                        ${durationHtml}
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            }
+
+            container.innerHTML = "";
+            container.appendChild(grid);
+
+        } catch (err) {
+            container.innerHTML = `<div class="state-msg">Не удалось загрузить фильмы</div>`;
+            console.error(err);
+        }
+    }
+
+    loadMovies();
+</script>
+
+</body>
+</html>
