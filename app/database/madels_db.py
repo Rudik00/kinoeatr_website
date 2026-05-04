@@ -81,7 +81,8 @@ class MovieSession(Base):
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     hall_id = Column(Integer, ForeignKey("cinema_hall.id", ondelete="RESTRICT"), nullable=False)
     starts_at = Column(DateTime, nullable=False)
-    base_price = Column(Integer, nullable=False) # Базовая цена билета на этот сеанс
+    # Базовая цена билета на этот сеанс
+    base_price = Column(Integer, nullable=False)
 # ___________________________________________________________________________________
 #                                      Бронирование
 

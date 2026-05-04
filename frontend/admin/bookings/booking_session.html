@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Бронирования Сеанса</title>
+  <style>
+    :root {
+      --bg: #f3f6fb;
+      --ink: #162033;
+      --muted: #64748b;
+      --panel: #ffffff;
+      --line: #e2e8f0;
+      --danger: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(140deg, #eff6ff 0%, #f8fafc 50%, #ecfeff 100%);
+      color: var(--ink);
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 34px);
+      letter-spacing: 0.01em;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      display: inline-block;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: #fcfdff;
+    }
+
+    .empty {
+      padding: 28px 16px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    .status.error {
+      display: block;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1 id="title">Бронирования Сеанса</h1>
+      <a class="btn" href="/bookings">Назад к сеансам</a>
+    </div>
+
+    <section class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Количество броней</div>
+        <div class="stat-value" id="bookings-count">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Свободных мест осталось</div>
+        <div class="stat-value" id="free-seats-count">—</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <p class="hint">Список броней по выбранному сеансу</p>
+        <button id="refresh-btn" class="btn" type="button">Обновить</button>
+      </div>
+
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Место</th>
+            </tr>
+          </thead>
+          <tbody id="bookings-body"></tbody>
+        </table>
+      </div>
+
+      <div id="empty" class="empty">Бронирований пока нет</div>
+    </section>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const API = {
+      me: "/admin/api/me",
+      bookingSession: (sessionId) => `/admin/api/bookings/${sessionId}`,
+      login: "/admin/login",
+    };
+
+    const bookingsBody = document.getElementById("bookings-body");
+    const empty = document.getElementById("empty");
+    const statusBox = document.getElementById("status");
+    const refreshBtn = document.getElementById("refresh-btn");
+
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const sessionId = Number(pathParts[pathParts.length - 1]);
+
+    function token() {
+      return localStorage.getItem("admin_token");
+    }
+
+    function showError(text) {
+      statusBox.className = "status error";
+      statusBox.textContent = text;
+    }
+
+    function clearError() {
+      statusBox.className = "status";
+      statusBox.textContent = "";
+    }
+
+    function renderBookings(bookings) {
+      bookingsBody.innerHTML = "";
+
+      if (bookings.length === 0) {
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+
+      for (const booking of bookings) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${booking.id ?? "-"}</td>
+          <td>${booking.email ?? "-"}</td>
+          <td>${booking.seat ?? "-"}</td>
+        `;
+        bookingsBody.appendChild(tr);
+      }
+    }
+
+    async function ensureAdmin() {
+      const t = token();
+      if (!t) {
+        window.location.href = API.login;
+        return false;
+      }
+
+      try {
+        const meResp = await fetch(API.me, {
+          headers: { Authorization: `Bearer ${t}` },
+        });
+
+        if (!meResp.ok) {
+          localStorage.removeItem("admin_token");
+          window.location.href = API.login;
+          return false;
+        }
+      } catch {
+        showError("Не удалось проверить авторизацию.");
+        return false;
+      }
+
+      return true;
+    }
+
+    async function loadBookings() {
+      clearError();
+      const t = token();
+      if (!t) return;
+
+      if (!Number.isInteger(sessionId) || sessionId <= 0) {
+        showError("Некорректный id сеанса в URL.");
+        renderBookings([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(API.bookingSession(sessionId), {
+          method: "GET",
+          headers: { Authorization: `Bearer ${t}` },
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          showError(`Ошибка загрузки бронирований: ${response.status}\n${text}`);
+          renderBookings([]);
+          return;
+        }
+
+        const payload = await response.json();
+        const bookings = Array.isArray(payload.bookings) ? payload.bookings : [];
+
+        document.getElementById("bookings-count").textContent = String(payload.bookings_count ?? bookings.length);
+        document.getElementById("free-seats-count").textContent = String(payload.free_seats_count ?? 0);
+        document.getElementById("title").textContent = `Бронирования Сеанса #${sessionId}`;
+
+        renderBookings(bookings);
+      } catch {
+        showError("Сервер недоступен.");
+        renderBookings([]);
+      }
+    }
+
+    refreshBtn.addEventListener("click", loadBookings);
+
+    (async function init() {
+      const ok = await ensureAdmin();
+      if (!ok) return;
+      await loadBookings();
+    })();
+  </script>
+</body>
+</html>

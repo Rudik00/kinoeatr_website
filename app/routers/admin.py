@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 from typing import List
 
 from ..db import get_db
@@ -14,6 +14,9 @@ from ..database.madels_db import (
     HallSeat, CinemaHall,
     Movies,
     MovieSession,
+    Reservation,
+    ReservationSeat,
+    Registered_users,
 )
 
 import datetime
@@ -32,6 +35,7 @@ bearer_scheme = HTTPBearer()
 #   3.1 - Зал
 #   3.2 - Фильм
 #   3.3 - Сеанс
+#   3.4 - Бронирования
 # 4 - Редактирование
 #   4.1 - Зал
 #   4.2 - Фильм
@@ -505,51 +509,6 @@ async def list_cinema_halls(db: AsyncSession = Depends(get_db)):
     }
 
 
-@router.get("/api/halls/{hall_id}")
-async def get_cinema_hall(
-    hall_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_admin: dict = Depends(get_current_admin),
-):
-    hall = await db.get(CinemaHall, hall_id)
-    if hall is None:
-        raise RequestValidationError(
-            errors=[
-                {
-                    "msg": "HALL_NOT_FOUND",
-                    "loc": (),
-                    "type": "value_error",
-                }
-            ]
-        )
-
-    seats = (
-        await db.execute(
-            select(HallSeat)
-            .filter_by(hall_id=hall_id)
-            .order_by(HallSeat.seat_row.asc(), HallSeat.seat_number.asc())
-        )
-    ).scalars().all()
-
-    rows_map = {}
-    for seat in seats:
-        if seat.seat_row not in rows_map:
-            rows_map[seat.seat_row] = {
-                "row_number": seat.seat_row,
-                "seats_count": 0,
-                "category": seat.category,
-            }
-        rows_map[seat.seat_row]["seats_count"] += 1
-
-    rows = [rows_map[key] for key in sorted(rows_map.keys())]
-
-    return {
-        "id": hall.id,
-        "name": hall.name_hall,
-        "rows": rows,
-    }
-
-
 # ____________________________________________________________________________________________
 #                                      3.2 - ФИЛЬМ
 # ____________________________________________________________________________________________
@@ -611,6 +570,130 @@ async def list_movie_sessions(
     }
 
 
+# ____________________________________________________________________________________________
+#                                      3.4 - БРОНИРОВАНИЯ
+# ____________________________________________________________________________________________
+@router.get("/api/bookings")
+async def list_bookings(
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    sessions = (
+        await db.execute(
+            select(MovieSession).order_by(MovieSession.starts_at.asc())
+        )
+    ).scalars().all()
+
+    movies = (await db.execute(select(Movies))).scalars().all()
+    halls = (await db.execute(select(CinemaHall))).scalars().all()
+
+    movie_name_by_id = {movie.id: movie.name for movie in movies}
+    hall_name_by_id = {hall.id: hall.name_hall for hall in halls}
+
+    return {
+        "sessions": [
+            {
+                "id": session.id,
+                "movie_id": session.movie_id,
+                "movie_name": movie_name_by_id.get(session.movie_id),
+                "hall_id": session.hall_id,
+                "hall_name": hall_name_by_id.get(session.hall_id),
+                "starts_at": session.starts_at.isoformat(),
+                "base_price": session.base_price,
+            }
+            for session in sessions
+        ]
+    }
+
+
+@router.get("/api/bookings/{session_id}")
+async def list_bookings_for_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin),
+):
+    session = await db.get(MovieSession, session_id)
+    if session is None:
+        raise RequestValidationError(
+            errors=[
+                {
+                    "msg": "SESSION_NOT_FOUND",
+                    "loc": (),
+                    "type": "value_error",
+                }
+            ]
+        )
+
+    hall_seats = (
+        await db.execute(select(HallSeat).filter_by(hall_id=session.hall_id))
+    ).scalars().all()
+    seat_by_id = {seat.id: seat for seat in hall_seats}
+    total_seats = len(hall_seats)
+
+    reservation_seats = (
+        await db.execute(
+            select(ReservationSeat).filter_by(session_id=session_id)
+        )
+    ).scalars().all()
+
+    reservation_ids = {item.reservation_id for item in reservation_seats}
+    reservations = (
+        await db.execute(
+            select(Reservation).where(Reservation.id.in_(reservation_ids))
+        )
+    ).scalars().all() if reservation_ids else []
+    reservation_by_id = {reservation.id: reservation for reservation in reservations}
+
+    user_ids = {
+        reservation.user_id
+        for reservation in reservations
+        if reservation.user_id is not None
+    }
+    users = (
+        await db.execute(
+            select(Registered_users).where(Registered_users.id.in_(user_ids))
+        )
+    ).scalars().all() if user_ids else []
+    user_email_by_id = {user.id: user.email_user for user in users}
+
+    bookings_items = []
+    for item in reservation_seats:
+        reservation = reservation_by_id.get(item.reservation_id)
+        seat = seat_by_id.get(item.seat_id)
+
+        guest_email = None
+        if reservation is not None:
+            if reservation.user_id is not None:
+                guest_email = user_email_by_id.get(reservation.user_id)
+            if not guest_email:
+                guest_email = reservation.guest_email
+
+        seat_label = "-"
+        if seat is not None:
+            seat_label = f"Ряд {seat.seat_row}, место {seat.seat_number}"
+
+        bookings_items.append(
+            {
+                "id": item.id,
+                "reservation_id": item.reservation_id,
+                "email": guest_email,
+                "seat": seat_label,
+            }
+        )
+
+    return {
+        "session": {
+            "id": session.id,
+            "movie_id": session.movie_id,
+            "hall_id": session.hall_id,
+            "starts_at": session.starts_at.isoformat(),
+        },
+        "bookings_count": len(bookings_items),
+        "free_seats_count": max(total_seats - len(bookings_items), 0),
+        "bookings": bookings_items,
+    }
+
+
 ##############################################################################################
 #                                      4 - РЕДАКТИРОВАНИЕ
 # ____________________________________________________________________________________________
@@ -662,35 +745,18 @@ class HallEdit(BaseModel):
 
 
 # 3. Эндпоинт (с учетом асинхронности)
-@router.put("/api/halls_edit/{hall_id}")
+@router.post("/api/halls_edit")
 async def edit_cinema_hall(
-    hall_id: int,
     hall_data: HallEdit,
-    db: AsyncSession = Depends(get_db),
-    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
-        hall = await db.get(CinemaHall, hall_id)
-        if hall is None:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        "msg": "HALL_NOT_FOUND",
-                        "loc": (),
-                        "type": "value_error",
-                    }
-                ]
-            )
-
-        existing_hall_with_name = (
-            await db.execute(
-                select(CinemaHall).filter_by(name_hall=hall_data.name)
-            )
-        ).scalar_one_or_none()
-        if (
-            existing_hall_with_name is not None
-            and existing_hall_with_name.id != hall_id
-        ):
+        # Создаем объект зала
+        new_hall = CinemaHall(name_hall=hall_data.name)
+        existing_halls = (
+            await db.execute(select(CinemaHall))
+        ).scalars().all()
+        if hall_data.name in [hall.name_hall for hall in existing_halls]:
             raise RequestValidationError(
                 errors=[
                     {
@@ -701,22 +767,24 @@ async def edit_cinema_hall(
                 ]
             )
 
-        hall.name_hall = hall_data.name
+        db.update(new_hall)
 
-        await db.execute(delete(HallSeat).where(HallSeat.hall_id == hall_id))
+        # flush() в асинхронном режиме требует await
+        await db.flush()
 
+        # Генерируем места
         for row in hall_data.rows:
             for seat_num in range(1, row.seats_count + 1):
                 seat = HallSeat(
-                    hall_id=hall_id,
+                    hall_id=new_hall.id,
                     seat_row=row.row_number,
                     seat_number=seat_num,
                     category=row.category
                 )
-                db.add(seat)
+                db.update(seat)
 
         await db.commit()
-        return {"status": "success", "hall_id": hall_id}
+        return {"status": "success", "hall_id": new_hall.id}
 
     except Exception as e:
         await db.rollback()
@@ -777,33 +845,24 @@ class MovieEdit(BaseModel):
 
 
 # Эндпоинт для редактирования фильма
-@router.put("/api/movies_edit/{movie_id}")
+@router.post("/api/movies_edit")
 async def edit_movie(
-    movie_id: int,
     movie_data: MovieEdit,
-    db: AsyncSession = Depends(get_db),
-    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
-        movie = await db.get(Movies, movie_id)
-        if movie is None:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        "msg": "MOVIE_NOT_FOUND",
-                        "loc": (),
-                        "type": "value_error",
-                    }
-                ]
-            )
-
-        existing_movie_with_name = (
-            await db.execute(select(Movies).filter_by(name=movie_data.name))
-        ).scalar_one_or_none()
-        if (
-            existing_movie_with_name is not None
-            and existing_movie_with_name.id != movie_id
-        ):
+        # Создаем объект фильма
+        new_movie = Movies(
+            name=movie_data.name,
+            duration=movie_data.duration,
+            description=movie_data.description,
+            release_date=movie_data.release_date,
+            preview_foto=movie_data.preview_foto
+        )
+        existing_movies = (
+            await db.execute(select(Movies))
+        ).scalars().all()
+        if movie_data.name in [movie.name for movie in existing_movies]:
             raise RequestValidationError(
                 errors=[
                     {
@@ -814,14 +873,12 @@ async def edit_movie(
                 ]
             )
 
-        movie.name = movie_data.name
-        movie.duration = movie_data.duration
-        movie.description = movie_data.description
-        movie.release_date = movie_data.release_date
-        movie.preview_foto = movie_data.preview_foto
+        db.update(new_movie)
 
+        # flush() в асинхронном режиме требует await
+        await db.flush()
         await db.commit()
-        return {"status": "success", "movie_id": movie.id}
+        return {"status": "success", "movie_id": new_movie.id}
 
     except Exception as e:
         await db.rollback()
@@ -873,26 +930,13 @@ class MovieSessionEdit(BaseModel):
         return v
 
 
-@router.put("/api/sessions_edit/{session_id}")
+@router.post("/api/sessions_edit")
 async def edit_movie_session(
-    session_id: int,
     session_data: MovieSessionEdit,
     db: AsyncSession = Depends(get_db),
     current_admin: dict = Depends(get_current_admin),
 ):
     try:
-        session = await db.get(MovieSession, session_id)
-        if session is None:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        "msg": "SESSION_NOT_FOUND",
-                        "loc": (),
-                        "type": "value_error",
-                    }
-                ]
-            )
-
         starts_at_dt = datetime.datetime.fromisoformat(session_data.starts_at)
         if starts_at_dt <= datetime.datetime.now():
             raise RequestValidationError(
@@ -931,10 +975,9 @@ async def edit_movie_session(
 
         conflict = (
             await db.execute(
-                select(MovieSession).where(
-                    MovieSession.hall_id == session_data.hall_id,
-                    MovieSession.starts_at == starts_at_dt,
-                    MovieSession.id != session_id,
+                select(MovieSession).filter_by(
+                    hall_id=session_data.hall_id,
+                    starts_at=starts_at_dt,
                 )
             )
         ).scalar_one_or_none()
@@ -949,14 +992,16 @@ async def edit_movie_session(
                 ]
             )
 
-        session.movie_id = session_data.movie_id
-        session.hall_id = session_data.hall_id
-        session.starts_at = starts_at_dt
-        session.base_price = session_data.base_price
-
+        new_session = MovieSession(
+            movie_id=session_data.movie_id,
+            hall_id=session_data.hall_id,
+            starts_at=starts_at_dt,
+            base_price=session_data.base_price,
+        )
+        db.update(new_session)
         await db.commit()
-        await db.refresh(session)
-        return {"status": "success", "session_id": session.id}
+        await db.refresh(new_session)
+        return {"status": "success", "session_id": new_session.id}
 
     except Exception as e:
         await db.rollback()
@@ -1107,9 +1152,10 @@ async def get_stats(
     movies_count = (await db.execute(select(func.count()).select_from(Movies))).scalar()
     sessions_count = (await db.execute(select(func.count()).select_from(MovieSession))).scalar()
     halls_count = (await db.execute(select(func.count()).select_from(CinemaHall))).scalar()
+    bookings_count = (await db.execute(select(func.count()).select_from(ReservationSeat))).scalar()
     return {
         "movies_count": movies_count,
         "sessions_count": sessions_count,
         "halls_count": halls_count,
-        "bookings_count": 0,
+        "bookings_count": bookings_count,
     }
