@@ -146,3 +146,8 @@ async def booking_detail_page(session_id: int):
 @app.get("/movies")
 async def home_page():
     return FileResponse("frontend/users/home_page.html")
+
+
+@app.get("/movie/{movie_id}")
+async def movie_detail(movie_id: int):
+    return FileResponse("frontend/users/movies.html")
