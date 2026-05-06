@@ -17,7 +17,13 @@ LOG_DIR = os.path.join(os.path.dirname(__file__), "logs")
 APP_LOG  = os.path.join(LOG_DIR, "app.log")
 ERR_LOG  = os.path.join(LOG_DIR, "errors.log")
 
-LOG_FORMAT = "%(asctime)s  [%(levelname)-8s]  %(name)s — %(message)s"
+LOG_FORMAT = (
+    "\n"
+    "==================== LOG ENTRY ====================\n"
+    "%(asctime)s  [%(levelname)-8s]  %(name)s\n"
+    "---------------------------------------------------\n"
+    "%(message)s\n"
+)
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 MAX_BYTES   = 5 * 1024 * 1024   # 5 МБ
@@ -63,11 +69,15 @@ def setup_logging(level: int = logging.INFO) -> None:
     root = logging.getLogger()
     root.setLevel(level)
 
-    # Избегаем дублирования хендлеров при повторном вызове
-    if not root.handlers:
-        root.addHandler(app_handler)
-        root.addHandler(err_handler)
-        root.addHandler(console_handler)
+    # Убираем все существующие file-хендлеры нашего логгера, чтобы не дублировать
+    # (uvicorn с reload=True может вызвать setup_logging повторно)
+    kinoeatr_logger = logging.getLogger("kinoeatr")
+    kinoeatr_logger.handlers.clear()
+    kinoeatr_logger.propagate = False
+    kinoeatr_logger.setLevel(level)
+    kinoeatr_logger.addHandler(app_handler)
+    kinoeatr_logger.addHandler(err_handler)
+    kinoeatr_logger.addHandler(console_handler)
 
     # Заглушить шумные библиотеки
     logging.getLogger("uvicorn.access").propagate = False

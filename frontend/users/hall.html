@@ -538,10 +538,6 @@
                 <input type="email" id="reg-email" placeholder="example@mail.ru">
             </div>
             <div class="modal-field">
-                <label>Телефон</label>
-                <input type="tel" id="reg-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel">
-            </div>
-            <div class="modal-field">
                 <label>Пароль</label>
                 <input type="password" id="reg-password" placeholder="••••••••">
             </div>
@@ -557,26 +553,6 @@
         </div>
     </div>
 </div>
-
-<datalist id="country-phone-codes">
-    <option value="+7">Россия (+7)</option>
-    <option value="+375">Беларусь (+375)</option>
-    <option value="+380">Украина (+380)</option>
-    <option value="+998">Узбекистан (+998)</option>
-    <option value="+996">Киргизия (+996)</option>
-    <option value="+992">Таджикистан (+992)</option>
-    <option value="+374">Армения (+374)</option>
-    <option value="+994">Азербайджан (+994)</option>
-    <option value="+995">Грузия (+995)</option>
-    <option value="+49">Германия (+49)</option>
-    <option value="+44">Великобритания (+44)</option>
-    <option value="+1">США/Канада (+1)</option>
-    <option value="+33">Франция (+33)</option>
-    <option value="+39">Италия (+39)</option>
-    <option value="+34">Испания (+34)</option>
-    <option value="+90">Турция (+90)</option>
-    <option value="+971">ОАЭ (+971)</option>
-</datalist>
 
 <script>
     async function renderHeaderAuth() {
@@ -796,20 +772,8 @@
         localStorage.setItem("user_token", token);
     }
 
-    function normalizePhone(raw) {
-        const value = raw.trim();
-        if (!value) return "";
-        const withPlus = value.startsWith("+") ? "+" : "";
-        const digits = value.replace(/\D/g, "");
-        return withPlus + digits;
-    }
-
     function isValidEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-    }
-
-    function isValidPhone(phone) {
-        return /^\+[1-9]\d{7,14}$/.test(phone);
     }
 
     async function isAuthenticated() {
@@ -859,6 +823,11 @@
                 body: JSON.stringify({ email, password }),
             });
 
+            if (res.status === 403) {
+                errorEl.textContent = "Подтвердите email перед входом. Проверьте почту.";
+                return;
+            }
+
             if (!res.ok) {
                 errorEl.textContent = "Неверный email или пароль";
                 return;
@@ -896,7 +865,7 @@
     });
 
     // Enter в полях регистрации
-    ["reg-name", "reg-surname", "reg-email", "reg-phone", "reg-password", "reg-password2"].forEach(id => {
+    ["reg-name", "reg-surname", "reg-email", "reg-password", "reg-password2"].forEach(id => {
         document.getElementById(id).addEventListener("keydown", e => {
             if (e.key === "Enter") document.getElementById("btn-reg-submit").click();
         });
@@ -907,22 +876,17 @@
         const name = document.getElementById("reg-name").value.trim();
         const surname = document.getElementById("reg-surname").value.trim();
         const email = document.getElementById("reg-email").value.trim();
-        const phone = normalizePhone(document.getElementById("reg-phone").value);
         const password = document.getElementById("reg-password").value;
         const password2 = document.getElementById("reg-password2").value;
         const errorEl = document.getElementById("reg-error");
         errorEl.textContent = "";
 
-        if (!name || !surname || !email || !phone || !password || !password2) {
+        if (!name || !surname || !email || !password || !password2) {
             errorEl.textContent = "Заполните все поля";
             return;
         }
         if (!isValidEmail(email)) {
             errorEl.textContent = "Введите корректный email";
-            return;
-        }
-        if (!isValidPhone(phone)) {
-            errorEl.textContent = "Введите телефон в международном формате, например +79991234567";
             return;
         }
         if (password !== password2) {
@@ -938,7 +902,7 @@
             const res = await fetch("/api/user/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, surname, email, phone, password }),
+                body: JSON.stringify({ name, surname, email, password }),
             });
 
             if (res.status === 409) {
@@ -951,9 +915,27 @@
             }
 
             const data = await res.json();
-            saveToken(data.access_token);
-            document.getElementById("auth-modal").classList.remove("open");
-            document.getElementById("reg-error").textContent = "";
+            const message = data.message || "Письмо с подтверждением отправлено на вашу почту.";
+            const devLinkHtml = data.dev_verify_url
+                ? `<p style="margin-top:12px; word-break:break-all;"><a href="${data.dev_verify_url}" target="_blank" rel="noopener">${data.dev_verify_url}</a></p>`
+                : "";
+
+            // Показываем сообщение внутри модалки вместо автовхода
+            document.getElementById("auth-modal").querySelector(".modal-body").innerHTML = `
+                <div style="text-align:center; padding:24px 8px;">
+                    <div style="font-size:40px; margin-bottom:12px;">✉️</div>
+                    <h3 style="margin-bottom:10px;">Проверьте почту</h3>
+                    <p style="color:#555; line-height:1.5; margin-bottom:20px;">
+                        ${message}
+                    </p>
+                    ${devLinkHtml}
+                    <button onclick="document.getElementById('auth-modal').classList.remove('open')"
+                            style="padding:10px 24px; background:#c0392b; color:#fff;
+                                   border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                        Закрыть
+                    </button>
+                </div>
+            `;
 
         } catch {
             errorEl.textContent = "Ошибка соединения";

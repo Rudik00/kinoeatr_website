@@ -210,10 +210,6 @@
                 <input type="email" id="reg-email" placeholder="example@mail.ru" required>
             </div>
             <div class="field">
-                <label>Телефон</label>
-                <input type="tel" id="reg-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel" required>
-            </div>
-            <div class="field">
                 <label>Пароль</label>
                 <input type="password" id="reg-password" placeholder="••••••••" required minlength="6">
             </div>
@@ -224,28 +220,24 @@
             <div class="error-msg" id="reg-error"></div>
             <button class="btn-submit" type="submit">Зарегистрироваться</button>
         </form>
+
+        <!-- Сообщение после успешной регистрации -->
+        <div id="reg-confirm-msg" style="display:none; text-align:center; padding: 32px 16px;">
+            <div style="font-size:48px; margin-bottom:16px;">✉️</div>
+            <h3 style="margin-bottom:12px;">Проверьте вашу почту</h3>
+            <p id="reg-confirm-text" style="color:#555; line-height:1.5;">
+                Мы отправили письмо с подтверждением на указанный адрес.<br>
+                Перейдите по ссылке в письме, чтобы завершить регистрацию.
+            </p>
+            <div id="reg-dev-link-wrap" style="display:none; margin-top:14px;">
+                <small style="display:block; color:#555; margin-bottom:6px;">
+                    Ссылка для подтверждения (dev):
+                </small>
+                <a id="reg-dev-link" href="#" target="_blank" rel="noopener"></a>
+            </div>
+        </div>
     </div>
 </main>
-
-<datalist id="country-phone-codes">
-    <option value="+7">Россия (+7)</option>
-    <option value="+375">Беларусь (+375)</option>
-    <option value="+380">Украина (+380)</option>
-    <option value="+998">Узбекистан (+998)</option>
-    <option value="+996">Киргизия (+996)</option>
-    <option value="+992">Таджикистан (+992)</option>
-    <option value="+374">Армения (+374)</option>
-    <option value="+994">Азербайджан (+994)</option>
-    <option value="+995">Грузия (+995)</option>
-    <option value="+49">Германия (+49)</option>
-    <option value="+44">Великобритания (+44)</option>
-    <option value="+1">США/Канада (+1)</option>
-    <option value="+33">Франция (+33)</option>
-    <option value="+39">Италия (+39)</option>
-    <option value="+34">Испания (+34)</option>
-    <option value="+90">Турция (+90)</option>
-    <option value="+971">ОАЭ (+971)</option>
-</datalist>
 
 <script>
     // Если уже залогинен — редиректим на фильмы
@@ -272,20 +264,8 @@
         window.location.href = back || "/movies";
     }
 
-    function normalizePhone(raw) {
-        const value = raw.trim();
-        if (!value) return "";
-        const withPlus = value.startsWith("+") ? "+" : "";
-        const digits = value.replace(/\D/g, "");
-        return withPlus + digits;
-    }
-
     function isValidEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-    }
-
-    function isValidPhone(phone) {
-        return /^\+[1-9]\d{7,14}$/.test(phone);
     }
 
     async function doLogin(e) {
@@ -304,6 +284,11 @@
                     password: document.getElementById("login-password").value,
                 }),
             });
+
+            if (res.status === 403) {
+                errEl.textContent = "Подтвердите email перед входом. Проверьте почту.";
+                return;
+            }
 
             if (!res.ok) {
                 errEl.textContent = "Неверный email или пароль";
@@ -331,15 +316,8 @@
         const password = document.getElementById("reg-password").value;
         const password2 = document.getElementById("reg-password2").value;
         const email = document.getElementById("reg-email").value.trim();
-        const phone = normalizePhone(document.getElementById("reg-phone").value);
-
         if (!isValidEmail(email)) {
             errEl.textContent = "Введите корректный email";
-            btn.disabled = false;
-            return;
-        }
-        if (!isValidPhone(phone)) {
-            errEl.textContent = "Введите телефон в международном формате, например +79991234567";
             btn.disabled = false;
             return;
         }
@@ -358,7 +336,6 @@
                     name: document.getElementById("reg-name").value.trim(),
                     surname: document.getElementById("reg-surname").value.trim(),
                     email,
-                    phone,
                     password,
                 }),
             });
@@ -374,8 +351,22 @@
             }
 
             const data = await res.json();
-            localStorage.setItem("user_token", data.access_token);
-            redirectAfterLogin();
+
+            // Показываем уведомление — письмо отправлено
+            document.getElementById("form-register").style.display = "none";
+            document.getElementById("reg-confirm-msg").style.display = "block";
+            document.getElementById("reg-confirm-text").textContent =
+                data.message || "Письмо с подтверждением отправлено на вашу почту.";
+
+            const devLinkWrap = document.getElementById("reg-dev-link-wrap");
+            const devLink = document.getElementById("reg-dev-link");
+            if (data.dev_verify_url) {
+                devLink.href = data.dev_verify_url;
+                devLink.textContent = data.dev_verify_url;
+                devLinkWrap.style.display = "block";
+            } else {
+                devLinkWrap.style.display = "none";
+            }
 
         } catch {
             errEl.textContent = "Ошибка соединения";

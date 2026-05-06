@@ -277,16 +277,12 @@
 
             <section class="section" id="section-settings">
                 <h1>Настройки</h1>
-                <p class="sub">Можно изменить email, телефон и пароль.</p>
+                <p class="sub">Можно изменить email и пароль.</p>
 
                 <form class="form" id="settings-form">
                     <div class="field">
                         <label>Email</label>
                         <input type="email" id="set-email" placeholder="Email">
-                    </div>
-                    <div class="field">
-                        <label>Телефон</label>
-                        <input type="tel" id="set-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel">
                     </div>
                     <div class="field">
                         <label>Текущий пароль (нужен только для смены пароля)</label>
@@ -314,26 +310,6 @@
         </aside>
     </div>
 </main>
-
-<datalist id="country-phone-codes">
-    <option value="+7">Россия (+7)</option>
-    <option value="+375">Беларусь (+375)</option>
-    <option value="+380">Украина (+380)</option>
-    <option value="+998">Узбекистан (+998)</option>
-    <option value="+996">Киргизия (+996)</option>
-    <option value="+992">Таджикистан (+992)</option>
-    <option value="+374">Армения (+374)</option>
-    <option value="+994">Азербайджан (+994)</option>
-    <option value="+995">Грузия (+995)</option>
-    <option value="+49">Германия (+49)</option>
-    <option value="+44">Великобритания (+44)</option>
-    <option value="+1">США/Канада (+1)</option>
-    <option value="+33">Франция (+33)</option>
-    <option value="+39">Италия (+39)</option>
-    <option value="+34">Испания (+34)</option>
-    <option value="+90">Турция (+90)</option>
-    <option value="+971">ОАЭ (+971)</option>
-</datalist>
 
 <script>
     const PASSWORD_MASK = "••••••";
@@ -414,20 +390,8 @@
         return localStorage.getItem("user_token");
     }
 
-    function normalizePhone(raw) {
-        const value = raw.trim();
-        if (!value) return "";
-        const withPlus = value.startsWith("+") ? "+" : "";
-        const digits = value.replace(/\D/g, "");
-        return withPlus + digits;
-    }
-
     function isValidEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-    }
-
-    function isValidPhone(phone) {
-        return /^\+[1-9]\d{7,14}$/.test(phone);
     }
 
     function switchTab(tab) {
@@ -457,11 +421,9 @@
             <div class="kv"><div class="k">Имя</div><div class="v">${user.name || "-"}</div></div>
             <div class="kv"><div class="k">Фамилия</div><div class="v">${user.surname || "-"}</div></div>
             <div class="kv"><div class="k">Email</div><div class="v">${user.email || "-"}</div></div>
-            <div class="kv"><div class="k">Телефон</div><div class="v">${user.phone || "-"}</div></div>
         `;
 
         document.getElementById("set-email").value = user.email || "";
-        document.getElementById("set-phone").value = user.phone || "";
     }
 
     function formatDate(iso) {
@@ -575,17 +537,12 @@
         ok.textContent = "";
 
         const email = document.getElementById("set-email").value.trim();
-        const phone = normalizePhone(document.getElementById("set-phone").value);
         const currentPassword = rawPasswords.current;
         const newPassword = rawPasswords.next;
         const newPassword2 = rawPasswords.next2;
 
         if (!isValidEmail(email)) {
             err.textContent = "Введите корректный email";
-            return;
-        }
-        if (!isValidPhone(phone)) {
-            err.textContent = "Введите телефон в международном формате, например +79991234567";
             return;
         }
         if (newPassword || newPassword2) {
@@ -605,7 +562,6 @@
 
         const body = {
             email,
-            phone,
             current_password: currentPassword || null,
             new_password: newPassword || null,
         };

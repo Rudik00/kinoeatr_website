@@ -1,9 +1,10 @@
 from sqlalchemy import (
+    Boolean,
     Column,
-    Integer,
-    String,
     DateTime,
     ForeignKey,
+    Integer,
+    String,
     UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base
@@ -24,15 +25,30 @@ class Admins(Base):
 #                                    Пользователи
 
 
-# Аккаунты пользователей: имя, почта, телефон, хешированный пароль.
+# Аккаунты пользователей: имя, почта, хешированный пароль.
 class Registered_users(Base):
     __tablename__ = "registered_users"
     id = Column(Integer, primary_key=True)
     name_user = Column(String, nullable=False)
     surname_user = Column(String, nullable=False)
     email_user = Column(String, nullable=False)
-    number_telephone_user = Column(String, nullable=False)
     password_user = Column(String, nullable=False)
+    is_verified = Column(Boolean, nullable=False, default=False)
+
+
+# Одноразовый токен подтверждения email.
+# Создаётся при регистрации, удаляется после использования или истечения TTL.
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_token"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("registered_users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    token = Column(String, nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
 # ___________________________________________________________________________________
 #                                   Территория кинотеатра
 

@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 import time
 from contextlib import asynccontextmanager
 
@@ -6,6 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+# Добавляем корень проекта в путь для импорта logging_config
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from logging_config import setup_logging  # noqa: E402
 
 from .database.create_db import init_db
 from .errors.admin_errors import (
@@ -22,6 +28,7 @@ logger = logging.getLogger("kinoeatr")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()   # вызывается внутри воркера uvicorn
     logger.info("=== Приложение КиноЗал запущено ===")
     await init_db()
     yield

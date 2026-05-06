@@ -1,21 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from sqlalchemy.exc import IntegrityError
+import secrets
+from datetime import datetime, timedelta
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, StringConstraints
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..database.madels_db import (
-    Movies, MovieSession,
-    CinemaHall, HallSeat,
+    CinemaHall,
+    EmailVerificationToken,
+    HallSeat,
+    MovieSession,
+    Movies,
+    Registered_users,
     Reservation,
     ReservationSeat,
-    Registered_users,
 )
-from ..utils.security import verify_password, hash_password
+from ..utils.email import build_verification_url, send_verification_email
 from ..utils.jwt_token import create_access_token_user, decode_access_token_user
+from ..utils.security import hash_password, verify_password
 
 router = APIRouter()
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -77,7 +85,6 @@ class UserRegisterData(BaseModel):
     name: str
     surname: str
     email: EmailStr
-    phone: Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{7,14}$")]
     password: Annotated[str, StringConstraints(min_length=6)]
 
 
@@ -88,10 +95,6 @@ class BookingCreateData(BaseModel):
 
 class UserSettingsUpdateData(BaseModel):
     email: EmailStr | None = None
-    phone: Annotated[
-        str | None,
-        StringConstraints(pattern=r"^\+[1-9]\d{7,14}$"),
-    ] = None
     current_password: str | None = None
     new_password: Annotated[
         str | None,
@@ -101,28 +104,101 @@ class UserSettingsUpdateData(BaseModel):
 
 @router.post("/api/user/register")
 async def user_register(data: UserRegisterData, db: AsyncSession = Depends(get_db)):
+    email_norm = str(data.email).strip().lower()
+
     existing = (
         await db.execute(
-            select(Registered_users).where(Registered_users.email_user == data.email)
+            select(Registered_users).where(Registered_users.email_user == email_norm)
         )
     ).scalar_one_or_none()
 
     if existing is not None:
-        raise HTTPException(status_code=409, detail="Пользователь с таким email уже существует")
+        if existing.is_verified:
+            raise HTTPException(
+                status_code=409,
+                detail="Пользователь с таким email уже существует",
+            )
+
+        # Пользователь есть, но не подтверждён: перевыпускаем токен.
+        existing.name_user = data.name
+        existing.surname_user = data.surname
+        existing.password_user = hash_password(data.password)
+
+        verification_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=24)
+        old_token = (
+            await db.execute(
+                select(EmailVerificationToken).where(
+                    EmailVerificationToken.user_id == existing.id
+                )
+            )
+        ).scalar_one_or_none()
+
+        if old_token is not None:
+            old_token.token = verification_token
+            old_token.expires_at = expires_at
+        else:
+            db.add(EmailVerificationToken(
+                user_id=existing.id,
+                token=verification_token,
+                expires_at=expires_at,
+            ))
+
+        await db.commit()
+
+        sent, reason = await send_verification_email(
+            existing.email_user,
+            verification_token,
+        )
+        if sent:
+            return {
+                "message": (
+                    "Аккаунт уже создан, но не подтверждён. "
+                    "Мы отправили новое письмо подтверждения."
+                )
+            }
+
+        return {
+            "message": (
+                "Аккаунт уже создан, но не подтверждён. "
+                "Почтовый сервис не настроен, используйте ссылку вручную."
+            ),
+            "dev_verify_url": build_verification_url(verification_token),
+            "email_error": reason,
+        }
 
     user = Registered_users(
         name_user=data.name,
         surname_user=data.surname,
-        email_user=data.email,
-        number_telephone_user=data.phone,
+        email_user=email_norm,
         password_user=hash_password(data.password),
+        is_verified=False,
     )
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    await db.flush()   # получаем user.id без коммита
 
-    token = create_access_token_user({"sub": user.email_user, "role": "user", "user_id": user.id})
-    return {"access_token": token, "token_type": "bearer"}
+    verification_token = secrets.token_urlsafe(32)
+    # В БД колонка TIMESTAMP WITHOUT TIME ZONE, сохраняем naive datetime.
+    expires_at = datetime.utcnow() + timedelta(hours=24)
+    db.add(EmailVerificationToken(
+        user_id=user.id,
+        token=verification_token,
+        expires_at=expires_at,
+    ))
+    await db.commit()
+
+    sent, reason = await send_verification_email(user.email_user, verification_token)
+    if sent:
+        return {"message": "Письмо с подтверждением отправлено на вашу почту"}
+
+    # Dev fallback: показываем ссылку подтверждения, если SMTP ещё не настроен.
+    return {
+        "message": (
+            "Почтовый сервис не настроен. Откройте ссылку подтверждения вручную."
+        ),
+        "dev_verify_url": build_verification_url(verification_token),
+        "email_error": reason,
+    }
 
 
 @router.post("/api/user/login")
@@ -136,8 +212,84 @@ async def user_login(data: UserLoginData, db: AsyncSession = Depends(get_db)):
     if user is None or not verify_password(data.password, user.password_user):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
-    token = create_access_token_user({"sub": user.email_user, "role": "user", "user_id": user.id})
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Пожалуйста, подтвердите ваш email перед входом",
+        )
+
+    token = create_access_token_user(
+        {"sub": user.email_user, "role": "user", "user_id": user.id}
+    )
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/api/user/verify/{token}")
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+    now = datetime.utcnow()
+
+    record = (
+        await db.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.token == token
+            )
+        )
+    ).scalar_one_or_none()
+
+    if record is None:
+        return HTMLResponse(
+            content="<h2>Ссылка недействительна или уже использована.</h2>",
+            status_code=400,
+        )
+
+    if now > record.expires_at:
+        await db.delete(record)
+        await db.commit()
+        return HTMLResponse(
+            content="<h2>Ссылка истекла. Зарегистрируйтесь повторно.</h2>",
+            status_code=400,
+        )
+
+    user = (
+        await db.execute(
+            select(Registered_users).where(
+                Registered_users.id == record.user_id
+            )
+        )
+    ).scalar_one_or_none()
+
+    if user is None:
+        await db.delete(record)
+        await db.commit()
+        return HTMLResponse(
+            content="<h2>Пользователь не найден.</h2>",
+            status_code=400,
+        )
+
+    user.is_verified = True
+    await db.delete(record)
+    await db.commit()
+
+    jwt = create_access_token_user(
+        {"sub": user.email_user, "role": "user", "user_id": user.id}
+    )
+    # Редиректим на /movies с токеном в hash — JS подхватит и сохранит
+    return HTMLResponse(
+        content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Email подтверждён</title></head>
+        <body>
+          <p>Email подтверждён, перенаправляем…</p>
+          <script>
+            localStorage.setItem('user_token', '{jwt}');
+            window.location.href = '/movies';
+          </script>
+        </body>
+        </html>
+        """,
+        status_code=200,
+    )
 
 
 @router.get("/api/check-auth")
@@ -353,7 +505,6 @@ async def user_me(
         "name": user.name_user,
         "surname": user.surname_user,
         "email": user.email_user,
-        "phone": user.number_telephone_user,
     }
 
 
@@ -454,7 +605,7 @@ async def user_settings_update(
     if user is None:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    if data.email is None and data.phone is None and data.new_password is None:
+    if data.email is None and data.new_password is None:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
 
     if data.email is not None and data.email != user.email_user:
@@ -466,9 +617,6 @@ async def user_settings_update(
         if existing is not None and existing.id != user.id:
             raise HTTPException(status_code=409, detail="Email уже используется")
         user.email_user = data.email
-
-    if data.phone is not None:
-        user.number_telephone_user = data.phone
 
     if data.new_password is not None:
         if not data.current_password:
@@ -495,7 +643,6 @@ async def user_settings_update(
             "name": user.name_user,
             "surname": user.surname_user,
             "email": user.email_user,
-            "phone": user.number_telephone_user,
         },
     }
 
