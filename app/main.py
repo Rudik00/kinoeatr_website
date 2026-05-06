@@ -1,36 +1,59 @@
+import logging
+import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-
-# обработчики ошибок
+from .database.create_db import init_db
 from .errors.admin_errors import (
     handle_admin_login_errors,
     handle_hall_create_errors,
     handle_movie_create_errors,
     handle_session_create_errors,
 )
-
-# роутеры
 from .routers.admin import router as admin_router
 from .routers.movies import router as movies_router
 
-# база данных
-from .database.create_db import init_db
-from contextlib import asynccontextmanager
+logger = logging.getLogger("kinoeatr")
 
 
-# при запуске приложения выполняется init_db,
-# который создает таблицы в базе данных,
-# если их нет
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()   # выполняется один раз при запуске
+    logger.info("=== Приложение КиноЗал запущено ===")
+    await init_db()
     yield
+    logger.info("=== Приложение КиноЗал остановлено ===")
 
 
 app = FastAPI(title="Cinema Reservation API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.error(
+            "Необработанное исключение: %s %s — %s",
+            request.method, request.url.path, exc,
+            exc_info=True,
+        )
+        raise
+    elapsed = (time.perf_counter() - start) * 1000
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(
+        level,
+        "%s %s → %s  (%.1f ms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed,
+    )
+    return response
 
 # статические файлы (фронтенд)
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
@@ -47,6 +70,10 @@ async def validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ):
+    logger.warning(
+        "Ошибка валидации: %s %s — %s",
+        request.method, request.url.path, exc.errors(),
+    )
     for error in exc.errors():
         # достаем наш код из msg (Pydantic добавляет "Value error, " в начало)
         code = error.get("msg", "").replace("Value error, ", "")
@@ -67,6 +94,7 @@ async def validation_error_handler(
         status_code=422,
         content={"detail": "Ошибка валидации"},
     )
+
 
 ################################################################
 #                                       РОУТЫ ДЛЯ АДМИНА
