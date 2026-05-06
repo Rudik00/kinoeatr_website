@@ -152,9 +152,41 @@
             font-weight: 700;
         }
 
+        .booking-actions {
+            margin-top: 10px;
+        }
+
+        .cancel-btn {
+            border: 1px solid #7f1d1d;
+            background: #3b0b0b;
+            color: #fecaca;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .cancel-btn:hover {
+            background: #4a1010;
+        }
+
         .empty {
             color: #64748b;
             padding: 14px 0;
+        }
+
+        .bookings-error {
+            color: #f87171;
+            min-height: 18px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .bookings-ok {
+            color: #22c55e;
+            min-height: 18px;
+            font-size: 13px;
+            margin-bottom: 10px;
         }
 
         .form {
@@ -238,6 +270,8 @@
                 <div class="user-grid" id="user-grid"></div>
 
                 <h2 style="font-size:18px;margin-bottom:10px;">Мои бронирования</h2>
+                <div class="bookings-error" id="bookings-error"></div>
+                <div class="bookings-ok" id="bookings-ok"></div>
                 <div class="booking-list" id="booking-list"></div>
             </section>
 
@@ -256,15 +290,15 @@
                     </div>
                     <div class="field">
                         <label>Текущий пароль (нужен только для смены пароля)</label>
-                        <input type="password" id="set-current-password" placeholder="••••••••">
+                        <input type="text" id="set-current-password" placeholder="••••••" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                     </div>
                     <div class="field">
                         <label>Новый пароль</label>
-                        <input type="password" id="set-new-password" placeholder="••••••••">
+                        <input type="text" id="set-new-password" placeholder="••••••" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                     </div>
                     <div class="field">
                         <label>Повторите новый пароль</label>
-                        <input type="password" id="set-new-password2" placeholder="••••••••">
+                        <input type="text" id="set-new-password2" placeholder="••••••" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                     </div>
                     <div class="hint">Новый пароль должен быть не короче 6 символов.</div>
                     <div class="error" id="settings-error"></div>
@@ -302,6 +336,80 @@
 </datalist>
 
 <script>
+    const PASSWORD_MASK = "••••••";
+    const rawPasswords = {
+        current: "",
+        next: "",
+        next2: "",
+    };
+
+    function maskValue(value) {
+        return value ? PASSWORD_MASK : "";
+    }
+
+    function bindFixedMask(inputId, key) {
+        const input = document.getElementById(inputId);
+
+        input.addEventListener("beforeinput", (e) => {
+            const inputType = e.inputType || "";
+            const data = e.data || "";
+
+            if (inputType.startsWith("delete")) {
+                rawPasswords[key] = rawPasswords[key].slice(0, -1);
+                input.value = maskValue(rawPasswords[key]);
+                e.preventDefault();
+                return;
+            }
+
+            if (inputType === "insertText") {
+                rawPasswords[key] += data;
+                input.value = maskValue(rawPasswords[key]);
+                e.preventDefault();
+                return;
+            }
+
+            if (inputType === "insertFromPaste") {
+                rawPasswords[key] += data;
+                input.value = maskValue(rawPasswords[key]);
+                e.preventDefault();
+                return;
+            }
+
+            if (inputType === "insertLineBreak") {
+                e.preventDefault();
+            }
+        });
+
+        input.addEventListener("paste", (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData && e.clipboardData.getData("text")) || "";
+            if (!text) return;
+            rawPasswords[key] += text;
+            input.value = maskValue(rawPasswords[key]);
+        });
+
+        input.addEventListener("focus", () => {
+            input.value = maskValue(rawPasswords[key]);
+        });
+
+        input.addEventListener("blur", () => {
+            input.value = maskValue(rawPasswords[key]);
+        });
+    }
+
+    function clearPasswordFields() {
+        rawPasswords.current = "";
+        rawPasswords.next = "";
+        rawPasswords.next2 = "";
+        document.getElementById("set-current-password").value = "";
+        document.getElementById("set-new-password").value = "";
+        document.getElementById("set-new-password2").value = "";
+    }
+
+    bindFixedMask("set-current-password", "current");
+    bindFixedMask("set-new-password", "next");
+    bindFixedMask("set-new-password2", "next2");
+
     function getToken() {
         return localStorage.getItem("user_token");
     }
@@ -386,9 +494,47 @@
                         <div><strong>Места:</strong> ${seats || "-"}</div>
                     </div>
                     <div class="booking-total">Сумма: ${b.total_price || 0} ₽</div>
+                    <div class="booking-actions">
+                        <button class="cancel-btn" onclick="cancelBooking(${b.reservation_id})">Отменить бронирование</button>
+                    </div>
                 </div>
             `;
         }).join("");
+    }
+
+    async function loadBookingsOnly() {
+        const bookingsRes = await fetchJSON("/api/user/bookings");
+        const bookingsData = await bookingsRes.json();
+        renderBookings(bookingsData.bookings || []);
+    }
+
+    async function cancelBooking(reservationId) {
+        const err = document.getElementById("bookings-error");
+        const ok = document.getElementById("bookings-ok");
+        err.textContent = "";
+        ok.textContent = "";
+
+        const confirmed = window.confirm("Отменить это бронирование?");
+        if (!confirmed) return;
+
+        try {
+            const res = await fetchJSON(`/api/user/bookings/${reservationId}`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                err.textContent = data.detail || "Не удалось отменить бронирование";
+                return;
+            }
+
+            ok.textContent = "Бронирование отменено";
+            await loadBookingsOnly();
+        } catch (e2) {
+            if (String(e2.message) !== "unauthorized") {
+                err.textContent = "Ошибка соединения";
+            }
+        }
     }
 
     async function loadProfilePage() {
@@ -410,6 +556,8 @@
         renderBookings(bookingsData.bookings || []);
     }
 
+    window.cancelBooking = cancelBooking;
+
     document.getElementById("tab-profile").addEventListener("click", () => switchTab("profile"));
     document.getElementById("tab-settings").addEventListener("click", () => switchTab("settings"));
 
@@ -428,9 +576,9 @@
 
         const email = document.getElementById("set-email").value.trim();
         const phone = normalizePhone(document.getElementById("set-phone").value);
-        const currentPassword = document.getElementById("set-current-password").value;
-        const newPassword = document.getElementById("set-new-password").value;
-        const newPassword2 = document.getElementById("set-new-password2").value;
+        const currentPassword = rawPasswords.current;
+        const newPassword = rawPasswords.next;
+        const newPassword2 = rawPasswords.next2;
 
         if (!isValidEmail(email)) {
             err.textContent = "Введите корректный email";
@@ -480,9 +628,7 @@
                 localStorage.setItem("user_token", data.access_token);
             }
 
-            document.getElementById("set-current-password").value = "";
-            document.getElementById("set-new-password").value = "";
-            document.getElementById("set-new-password2").value = "";
+            clearPasswordFields();
             ok.textContent = "Настройки успешно обновлены";
 
             if (data.user) {

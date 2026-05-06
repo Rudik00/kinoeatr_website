@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
 from typing import Annotated
 from pydantic import BaseModel, EmailStr, StringConstraints
@@ -20,7 +20,19 @@ from ..utils.jwt_token import create_access_token_user, decode_access_token_user
 router = APIRouter()
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# Реализованы следующие страницы:
+# 1 - Проверка токена
+# 2 - Регистрация и авторизация
+# 3 - Главная страница с каталогом фильмов
+# 4 - Страница фильма с его сеансами
+# 5 - Страница зала с выбором мест
+# 6 - Подтверждение бронирования
+# 7 - Личный кабинет с историей бронирований и настройками профиля
 
+
+##############################################################################################
+#                                      1 - ПРОВЕРКА ТОКЕНА
+# ___________________________________________________________________________________________
 def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ):
@@ -53,8 +65,9 @@ def category_price(category: str, base_price: int) -> int:
     return base_price
 
 
-# ── Авторизация пользователя ─────────────────────────────────────────────────
-
+##############################################################################################
+#                                      2 - РЕГИСТРАЦИЯ И АВТОРИЗАЦИЯ
+# ____________________________________________________________________________________________
 class UserLoginData(BaseModel):
     email: str
     password: str
@@ -136,6 +149,196 @@ async def check_auth(
     return {"authenticated": True, "email": current_user.get("sub")}
 
 
+##############################################################################################
+#                                      3 - ГЛАВНАЯ СТРАНИЦА
+# ____________________________________________________________________________________________
+@router.get("/api/movies")
+async def list_movies_page(db: AsyncSession = Depends(get_db)):
+    movies = (await db.execute(select(Movies))).scalars().all()
+    return {
+        "movies": [
+            {
+                "id": movie.id,
+                "name": movie.name,
+                "duration": movie.duration,
+                "release_date": movie.release_date,
+                "description": movie.description,
+                "preview_foto": movie.preview_foto,
+            }
+            for movie in movies
+        ]
+    }
+
+
+##############################################################################################
+#                                      4 - СТРАНИЦА ФИЛЬМА
+# ____________________________________________________________________________________________
+@router.get("/api/movies/{movie_id}")
+async def movie_detail_page(movie_id: int, db: AsyncSession = Depends(get_db)):
+    movie = await db.get(Movies, movie_id)
+    if not movie:
+        return {"error": "Фильм не найден"}
+
+    sessions = (
+        await db.execute(
+            select(MovieSession)
+            .where(MovieSession.movie_id == movie_id)
+            .order_by(MovieSession.starts_at.asc())
+        )
+    ).scalars().all()
+
+    halls = (await db.execute(select(CinemaHall))).scalars().all()
+    hall_name_by_id = {h.id: h.name_hall for h in halls}
+
+    return {
+        "id": movie.id,
+        "name": movie.name,
+        "duration": movie.duration,
+        "release_date": movie.release_date,
+        "description": movie.description,
+        "preview_foto": movie.preview_foto,
+        "sessions": [
+            {
+                "id": session.id,
+                "hall_id": session.hall_id,
+                "hall_name": hall_name_by_id.get(session.hall_id),
+                "starts_at": session.starts_at.isoformat(),
+                "base_price": session.base_price,
+            }
+            for session in sessions
+        ],
+    }
+
+
+##############################################################################################
+#                                      5 - СТРАНИЦА ЗАЛА
+# ____________________________________________________________________________________________
+@router.get("/api/sessions/{session_id}")
+async def session_detail(session_id: int, db: AsyncSession = Depends(get_db)):
+    session = await db.get(MovieSession, session_id)
+    if not session:
+        return {"error": "Сеанс не найден"}
+
+    movie = await db.get(Movies, session.movie_id)
+    hall = await db.get(CinemaHall, session.hall_id)
+
+    # Все места зала
+    seats = (
+        await db.execute(
+            select(HallSeat)
+            .where(HallSeat.hall_id == session.hall_id)
+            .order_by(HallSeat.seat_row, HallSeat.seat_number)
+        )
+    ).scalars().all()
+
+    # Занятые места на этот сеанс
+    booked_seat_ids = set(
+        (
+            await db.execute(
+                select(ReservationSeat.seat_id)
+                .where(ReservationSeat.session_id == session_id)
+            )
+        ).scalars().all()
+    )
+
+    return {
+        "session": {
+            "id": session.id,
+            "starts_at": session.starts_at.isoformat(),
+            "base_price": session.base_price,
+            "movie_name": movie.name if movie else None,
+            "hall_name": hall.name_hall if hall else None,
+        },
+        "seats": [
+            {
+                "id": seat.id,
+                "row": seat.seat_row,
+                "number": seat.seat_number,
+                "category": seat.category,
+                "booked": seat.id in booked_seat_ids,
+            }
+            for seat in seats
+        ],
+    }
+
+
+##############################################################################################
+#                                      6 - ПОДТВЕРЖДЕНИЕ БРОНИРОВАНИЯ
+# ____________________________________________________________________________________________
+@router.post("/api/user/bookings")
+async def create_user_booking(
+    data: BookingCreateData,
+    current_user=Depends(get_current_user_required),
+    db: AsyncSession = Depends(get_db),
+):
+    if not data.seat_ids:
+        raise HTTPException(status_code=400, detail="Не выбраны места")
+
+    session = await db.get(MovieSession, data.session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Сеанс не найден")
+
+    seat_ids = sorted(set(data.seat_ids))
+
+    hall_seats = (
+        await db.execute(
+            select(HallSeat)
+            .where(HallSeat.hall_id == session.hall_id)
+            .where(HallSeat.id.in_(seat_ids))
+        )
+    ).scalars().all()
+
+    if len(hall_seats) != len(seat_ids):
+        raise HTTPException(status_code=400, detail="Некоторые места не относятся к этому залу")
+
+    already_booked = (
+        await db.execute(
+            select(ReservationSeat.seat_id)
+            .where(ReservationSeat.session_id == data.session_id)
+            .where(ReservationSeat.seat_id.in_(seat_ids))
+        )
+    ).scalars().all()
+
+    if already_booked:
+        raise HTTPException(status_code=409, detail="Некоторые места уже заняты")
+
+    reservation = Reservation(
+        user_id=current_user.get("user_id"),
+        session_id=data.session_id,
+    )
+    db.add(reservation)
+    await db.flush()
+
+    total_price = 0
+    for seat in hall_seats:
+        final_price = category_price(seat.category, session.base_price)
+        total_price += final_price
+        db.add(
+            ReservationSeat(
+                reservation_id=reservation.id,
+                session_id=data.session_id,
+                seat_id=seat.id,
+                final_price=final_price,
+            )
+        )
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Места уже заняты")
+
+    return {
+        "reservation_id": reservation.id,
+        "session_id": data.session_id,
+        "seat_ids": seat_ids,
+        "total_price": total_price,
+    }
+
+
+##############################################################################################
+#                                      7 - ЛИЧНЫЙ КАБИНЕТ
+# ____________________________________________________________________________________________
 @router.get("/api/user/me")
 async def user_me(
     current_user=Depends(get_current_user_required),
@@ -297,178 +500,25 @@ async def user_settings_update(
     }
 
 
-@router.post("/api/user/bookings")
-async def create_user_booking(
-    data: BookingCreateData,
+@router.delete("/api/user/bookings/{reservation_id}")
+async def cancel_user_booking(
+    reservation_id: int,
     current_user=Depends(get_current_user_required),
     db: AsyncSession = Depends(get_db),
 ):
-    if not data.seat_ids:
-        raise HTTPException(status_code=400, detail="Не выбраны места")
+    reservation = await db.get(Reservation, reservation_id)
+    if reservation is None:
+        raise HTTPException(status_code=404, detail="Бронирование не найдено")
 
-    session = await db.get(MovieSession, data.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Сеанс не найден")
+    if reservation.user_id != current_user.get("user_id"):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому бронированию")
 
-    seat_ids = sorted(set(data.seat_ids))
-
-    hall_seats = (
-        await db.execute(
-            select(HallSeat)
-            .where(HallSeat.hall_id == session.hall_id)
-            .where(HallSeat.id.in_(seat_ids))
+    await db.execute(
+        delete(ReservationSeat).where(
+            ReservationSeat.reservation_id == reservation_id
         )
-    ).scalars().all()
-
-    if len(hall_seats) != len(seat_ids):
-        raise HTTPException(status_code=400, detail="Некоторые места не относятся к этому залу")
-
-    already_booked = (
-        await db.execute(
-            select(ReservationSeat.seat_id)
-            .where(ReservationSeat.session_id == data.session_id)
-            .where(ReservationSeat.seat_id.in_(seat_ids))
-        )
-    ).scalars().all()
-
-    if already_booked:
-        raise HTTPException(status_code=409, detail="Некоторые места уже заняты")
-
-    reservation = Reservation(
-        user_id=current_user.get("user_id"),
-        session_id=data.session_id,
     )
-    db.add(reservation)
-    await db.flush()
+    await db.execute(delete(Reservation).where(Reservation.id == reservation_id))
+    await db.commit()
 
-    total_price = 0
-    for seat in hall_seats:
-        final_price = category_price(seat.category, session.base_price)
-        total_price += final_price
-        db.add(
-            ReservationSeat(
-                reservation_id=reservation.id,
-                session_id=data.session_id,
-                seat_id=seat.id,
-                final_price=final_price,
-            )
-        )
-
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status_code=409, detail="Места уже заняты")
-
-    return {
-        "reservation_id": reservation.id,
-        "session_id": data.session_id,
-        "seat_ids": seat_ids,
-        "total_price": total_price,
-    }
-
-
-@router.get("/api/movies")
-async def list_movies_page(db: AsyncSession = Depends(get_db)):
-    movies = (await db.execute(select(Movies))).scalars().all()
-    return {
-        "movies": [
-            {
-                "id": movie.id,
-                "name": movie.name,
-                "duration": movie.duration,
-                "release_date": movie.release_date,
-                "description": movie.description,
-                "preview_foto": movie.preview_foto,
-            }
-            for movie in movies
-        ]
-    }
-
-# детали фильма и его сеансов
-@router.get("/api/movies/{movie_id}")
-async def movie_detail_page(movie_id: int, db: AsyncSession = Depends(get_db)):
-    movie = await db.get(Movies, movie_id)
-    if not movie:
-        return {"error": "Фильм не найден"}
-
-    sessions = (
-        await db.execute(
-            select(MovieSession)
-            .where(MovieSession.movie_id == movie_id)
-            .order_by(MovieSession.starts_at.asc())
-        )
-    ).scalars().all()
-
-    halls = (await db.execute(select(CinemaHall))).scalars().all()
-    hall_name_by_id = {h.id: h.name_hall for h in halls}
-
-    return {
-        "id": movie.id,
-        "name": movie.name,
-        "duration": movie.duration,
-        "release_date": movie.release_date,
-        "description": movie.description,
-        "preview_foto": movie.preview_foto,
-        "sessions": [
-            {
-                "id": session.id,
-                "hall_id": session.hall_id,
-                "hall_name": hall_name_by_id.get(session.hall_id),
-                "starts_at": session.starts_at.isoformat(),
-                "base_price": session.base_price,
-            }
-            for session in sessions
-        ],
-    }
-
-# выбор места на конкретный сеанс
-@router.get("/api/sessions/{session_id}")
-async def session_detail(session_id: int, db: AsyncSession = Depends(get_db)):
-    session = await db.get(MovieSession, session_id)
-    if not session:
-        return {"error": "Сеанс не найден"}
-
-    movie = await db.get(Movies, session.movie_id)
-    hall = await db.get(CinemaHall, session.hall_id)
-
-    # Все места зала
-    seats = (
-        await db.execute(
-            select(HallSeat)
-            .where(HallSeat.hall_id == session.hall_id)
-            .order_by(HallSeat.seat_row, HallSeat.seat_number)
-        )
-    ).scalars().all()
-
-    # Занятые места на этот сеанс
-    booked_seat_ids = set(
-        (
-            await db.execute(
-                select(ReservationSeat.seat_id)
-                .where(ReservationSeat.session_id == session_id)
-            )
-        ).scalars().all()
-    )
-
-    return {
-        "session": {
-            "id": session.id,
-            "starts_at": session.starts_at.isoformat(),
-            "base_price": session.base_price,
-            "movie_name": movie.name if movie else None,
-            "hall_name": hall.name_hall if hall else None,
-        },
-        "seats": [
-            {
-                "id": seat.id,
-                "row": seat.seat_row,
-                "number": seat.seat_number,
-                "category": seat.category,
-                "booked": seat.id in booked_seat_ids,
-            }
-            for seat in seats
-        ],
-    }
-
-
+    return {"message": "Бронирование отменено"}
