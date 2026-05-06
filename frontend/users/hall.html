@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Выбор мест</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Шапка */
+        header {
+            background: #1a1a2e;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2d2d5e;
+        }
+
+        header .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        header .logo svg {
+            height: 52px;
+            width: auto;
+            filter: drop-shadow(0 0 6px rgba(165,180,252,0.4));
+        }
+
+        header .logo span {
+            font-size: 20px;
+            font-weight: 700;
+            color: #a5b4fc;
+            letter-spacing: 1px;
+        }
+
+        header nav a {
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-left: 24px;
+            font-size: 14px;
+            transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        header nav a:hover { color: #a5b4fc; }
+
+        .profile-link {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #2d2d5e;
+            border-radius: 999px;
+            justify-content: center;
+        }
+
+        .profile-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Основной контент */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 40px 0;
+            overflow: hidden;
+        }
+
+        /* Инфо о сеансе */
+        .session-info {
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .session-info h1 {
+            font-size: 22px;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+
+        .session-meta {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .session-meta span { color: #a5b4fc; font-weight: 600; }
+
+        /* Легенда */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .legend-seat {
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            flex-shrink: 0;
+        }
+
+        /* Экран */
+        .screen-wrap {
+            text-align: center;
+            margin-bottom: 32px;
+            flex-shrink: 0;
+        }
+
+        .screen {
+            display: inline-block;
+            width: 60%;
+            padding: 8px 0;
+            background: linear-gradient(180deg, #a5b4fc33 0%, transparent 100%);
+            border-top: 2px solid #a5b4fc88;
+            border-radius: 2px;
+            font-size: 12px;
+            color: #a5b4fc88;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* Зал */
+        .hall-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .hall {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            transform-origin: center center;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .row-label {
+            width: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: #475569;
+            flex-shrink: 0;
+        }
+
+        /* Место */
+        .seat {
+            width: 34px;
+            height: 34px;
+            border-radius: 6px 6px 4px 4px;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        /* Подголовник */
+        .seat::before {
+            content: "";
+            position: absolute;
+            top: -5px;
+            left: 4px;
+            right: 4px;
+            height: 5px;
+            border-radius: 3px 3px 0 0;
+            background: inherit;
+            filter: brightness(0.8);
+        }
+
+        .seat.free {
+            background: #4f46e5;
+        }
+
+        .seat.free:hover {
+            transform: scale(1.12);
+            box-shadow: 0 0 10px rgba(165,180,252,0.5);
+        }
+
+        .seat.vip {
+            background: #7c3aed;
+        }
+
+        .seat.premium {
+            background: #0e7490;
+        }
+
+        .seat.booked {
+            background: #334155;
+            cursor: not-allowed;
+        }
+
+        .seat.selected {
+            background: #22c55e;
+            transform: scale(1.12);
+            box-shadow: 0 0 10px rgba(34,197,94,0.5);
+        }
+
+        /* Панель заказа */
+        .order-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            border-top: 1px solid #2d2d5e;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+            z-index: 100;
+        }
+
+        .order-panel.visible {
+            transform: translateY(0);
+        }
+
+        .order-info {
+            font-size: 15px;
+            color: #cbd5e1;
+        }
+
+        .order-info strong {
+            color: #a5b4fc;
+            font-size: 18px;
+        }
+
+        .selected-seats-list {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .btn-order {
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-order:hover { background: #4338ca; }
+
+        /* Модалка авторизации */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: #1a1a2e;
+            border: 1px solid #2d2d5e;
+            border-radius: 16px;
+            padding: 32px;
+            width: 360px;
+            max-width: 90vw;
+            transform: translateY(20px);
+            transition: transform 0.2s;
+        }
+
+        .modal-overlay.open .modal {
+            transform: translateY(0);
+        }
+
+        .modal h2 {
+            font-size: 20px;
+            color: #f1f5f9;
+            margin-bottom: 20px;
+        }
+
+        .modal-field {
+            margin-bottom: 14px;
+        }
+
+        .modal-field label {
+            display: block;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modal-field input {
+            width: 100%;
+            background: #0f0f1a;
+            border: 1px solid #2d2d5e;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #f1f5f9;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .modal-field input:focus { border-color: #a5b4fc; }
+
+        .modal-error {
+            font-size: 13px;
+            color: #f87171;
+            margin-bottom: 14px;
+            min-height: 18px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-login {
+            flex: 1;
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            padding: 11px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-login:hover { background: #4338ca; }
+
+        .btn-cancel {
+            background: transparent;
+            color: #64748b;
+            border: 1px solid #2d2d5e;
+            padding: 11px 18px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .btn-cancel:hover { color: #cbd5e1; }
+
+        /* Вкладки в модалке */
+        .modal-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #2d2d5e;
+        }
+
+        .modal-tab {
+            flex: 1;
+            text-align: center;
+            padding: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .modal-tab.active {
+            color: #a5b4fc;
+            border-bottom-color: #a5b4fc;
+        }
+
+        .modal-form { display: none; }
+        .modal-form.active { display: block; }
+
+        .modal-field-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        /* Состояния */
+        .state-msg {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #2d2d5e;
+            border-top-color: #a5b4fc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="/movies" class="logo">
+        <svg viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 10 Q10 10 10 20 L10 90 L50 120 L50 50 L90 10 Z" fill="#a5b4fc"/>
+            <rect x="13" y="22" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="35" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="48" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="61" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="74" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="28" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="41" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="54" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="67" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="80" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+        </svg>
+        <span>КиноЗал</span>
+    </a>
+    <nav>
+        <a href="/movies">Все фильмы</a>
+        <a href="/login" id="auth-link" style="display:none">Войти</a>
+        <a href="/profile" id="profile-link" class="profile-link" style="display:none" title="Личный кабинет" aria-label="Личный кабинет">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div id="content">
+        <div class="state-msg">
+            <div class="spinner"></div>
+            Загружаем зал...
+        </div>
+    </div>
+</main>
+
+<!-- Панель заказа -->
+<div class="order-panel" id="order-panel">
+    <div class="order-info">
+        <div>Выбрано мест: <strong id="order-count">0</strong> &nbsp;·&nbsp; Итого: <strong id="order-total">0 ₽</strong></div>
+        <div class="selected-seats-list" id="order-seats"></div>
+    </div>
+    <button class="btn-order" id="btn-order">Забронировать</button>
+</div>
+
+<!-- Модалка авторизации -->
+<div class="modal-overlay" id="auth-modal">
+    <div class="modal" style="width:400px">
+        <div class="modal-tabs">
+            <div class="modal-tab active" onclick="switchModalTab('login')">Войти</div>
+            <div class="modal-tab" onclick="switchModalTab('register')">Регистрация</div>
+        </div>
+
+        <!-- Форма входа -->
+        <div class="modal-form active" id="modal-form-login">
+            <div class="modal-field">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="example@mail.ru">
+            </div>
+            <div class="modal-field">
+                <label>Пароль</label>
+                <input type="password" id="login-password" placeholder="••••••••">
+            </div>
+            <div class="modal-error" id="login-error"></div>
+            <div class="modal-actions">
+                <button class="btn-login" id="btn-login-submit">Войти</button>
+                <button class="btn-cancel" id="btn-modal-cancel">Отмена</button>
+            </div>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div class="modal-form" id="modal-form-register">
+            <div class="modal-field-row">
+                <div class="modal-field">
+                    <label>Имя</label>
+                    <input type="text" id="reg-name" placeholder="Иван">
+                </div>
+                <div class="modal-field">
+                    <label>Фамилия</label>
+                    <input type="text" id="reg-surname" placeholder="Иванов">
+                </div>
+            </div>
+            <div class="modal-field">
+                <label>Email</label>
+                <input type="email" id="reg-email" placeholder="example@mail.ru">
+            </div>
+            <div class="modal-field">
+                <label>Телефон</label>
+                <input type="tel" id="reg-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel">
+            </div>
+            <div class="modal-field">
+                <label>Пароль</label>
+                <input type="password" id="reg-password" placeholder="••••••••">
+            </div>
+            <div class="modal-field">
+                <label>Повторите пароль</label>
+                <input type="password" id="reg-password2" placeholder="••••••••">
+            </div>
+            <div class="modal-error" id="reg-error"></div>
+            <div class="modal-actions">
+                <button class="btn-login" id="btn-reg-submit">Зарегистрироваться</button>
+                <button class="btn-cancel" id="btn-modal-cancel2">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="country-phone-codes">
+    <option value="+7">Россия (+7)</option>
+    <option value="+375">Беларусь (+375)</option>
+    <option value="+380">Украина (+380)</option>
+    <option value="+998">Узбекистан (+998)</option>
+    <option value="+996">Киргизия (+996)</option>
+    <option value="+992">Таджикистан (+992)</option>
+    <option value="+374">Армения (+374)</option>
+    <option value="+994">Азербайджан (+994)</option>
+    <option value="+995">Грузия (+995)</option>
+    <option value="+49">Германия (+49)</option>
+    <option value="+44">Великобритания (+44)</option>
+    <option value="+1">США/Канада (+1)</option>
+    <option value="+33">Франция (+33)</option>
+    <option value="+39">Италия (+39)</option>
+    <option value="+34">Испания (+34)</option>
+    <option value="+90">Турция (+90)</option>
+    <option value="+971">ОАЭ (+971)</option>
+</datalist>
+
+<script>
+    async function renderHeaderAuth() {
+        const authLink = document.getElementById("auth-link");
+        const profileLink = document.getElementById("profile-link");
+        const token = localStorage.getItem("user_token");
+
+        if (!token) {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/check-auth", {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok && data.authenticated) {
+                authLink.style.display = "none";
+                profileLink.style.display = "inline-flex";
+            } else {
+                localStorage.removeItem("user_token");
+                authLink.style.display = "inline-flex";
+                profileLink.style.display = "none";
+            }
+        } catch {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+        }
+    }
+
+    const sessionId = window.location.pathname.split("/").filter(Boolean).pop();
+
+    // Выбранные места: Map<seatId, {row, number, price}>
+    const selected = new Map();
+
+    function formatDatetime(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString("ru-RU", {
+            day: "numeric", month: "long", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    function categoryPrice(category, basePrice) {
+        if (category === "vip") return Math.round(basePrice * 1.5);
+        if (category === "premium") return Math.round(basePrice * 2);
+        return basePrice;
+    }
+
+    function updatePanel() {
+        const panel = document.getElementById("order-panel");
+        const countEl = document.getElementById("order-count");
+        const totalEl = document.getElementById("order-total");
+        const seatsEl = document.getElementById("order-seats");
+
+        if (selected.size === 0) {
+            panel.classList.remove("visible");
+            return;
+        }
+
+        panel.classList.add("visible");
+        countEl.textContent = selected.size;
+
+        let total = 0;
+        const labels = [];
+        for (const [, s] of selected) {
+            total += s.price;
+            labels.push(`Р${s.row} М${s.number}`);
+        }
+        totalEl.textContent = total + " ₽";
+        seatsEl.textContent = labels.join(", ");
+    }
+
+    function toggleSeat(btn, seatId, row, number, category, basePrice) {
+        if (btn.classList.contains("booked")) return;
+
+        const price = categoryPrice(category, basePrice);
+
+        if (selected.has(seatId)) {
+            selected.delete(seatId);
+            btn.classList.remove("selected");
+            // восстанавливаем цвет по категории
+            btn.classList.add(category === "standard" ? "free" : category);
+        } else {
+            selected.set(seatId, { row, number, price });
+            btn.classList.remove("free", "vip", "premium");
+            btn.classList.add("selected");
+        }
+
+        updatePanel();
+    }
+
+    async function load() {
+        const container = document.getElementById("content");
+
+        try {
+            const res = await fetch(`/api/sessions/${sessionId}`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            if (data.error) {
+                container.innerHTML = `<div class="state-msg">Сеанс не найден</div>`;
+                return;
+            }
+
+            const { session, seats } = data;
+
+            // Группируем по рядам, сортируем ряды от большего к меньшему (экран сверху)
+            const rowsMap = {};
+            for (const seat of seats) {
+                if (!rowsMap[seat.row]) rowsMap[seat.row] = [];
+                rowsMap[seat.row].push(seat);
+            }
+            const sortedRows = Object.keys(rowsMap)
+                .map(Number)
+                .sort((a, b) => a - b); // ряд 1 сверху (ближе к экрану)
+
+            // HTML рядов
+            const rowsHtml = sortedRows.map(rowNum => {
+                const rowSeats = rowsMap[rowNum].sort((a, b) => a.number - b.number);
+                const seatsHtml = rowSeats.map(seat => {
+                    let cls = seat.booked ? "booked" : (seat.category === "standard" ? "free" : seat.category);
+                    return `<button
+                        class="seat ${cls}"
+                        title="Ряд ${seat.row}, место ${seat.number}"
+                        onclick="toggleSeat(this, ${seat.id}, ${seat.row}, ${seat.number}, '${seat.category}', ${session.base_price})"
+                        ${seat.booked ? "disabled" : ""}
+                    ></button>`;
+                }).join("");
+
+                return `<div class="row">
+                    <div class="row-label">${rowNum}</div>
+                    ${seatsHtml}
+                    <div class="row-label">${rowNum}</div>
+                </div>`;
+            }).join("");
+
+            container.innerHTML = `
+                <div class="session-info">
+                    <h1>${session.movie_name}</h1>
+                    <div class="session-meta">
+                        <div>${formatDatetime(session.starts_at)}</div>
+                        <div>Зал: <span>${session.hall_name}</span></div>
+                        <div>Цена от: <span>${session.base_price} ₽</span></div>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-seat" style="background:#4f46e5"></div>
+                        Стандарт
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-seat" style="background:#7c3aed"></div>
+                        VIP (+50%)
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-seat" style="background:#0e7490"></div>
+                        Премиум (×2)
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-seat" style="background:#334155"></div>
+                        Занято
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-seat" style="background:#22c55e"></div>
+                        Выбрано
+                    </div>
+                </div>
+
+                <div class="screen-wrap">
+                    <div class="screen">экран</div>
+                </div>
+
+                <div class="hall-wrap">
+                    <div class="hall" id="hall">${rowsHtml}</div>
+                </div>
+            `;
+
+            // Масштабируем зал чтобы вписался в доступное место
+            scaleHall();
+
+        } catch (err) {
+            container.innerHTML = `<div class="state-msg">Не удалось загрузить зал</div>`;
+            console.error(err);
+        }
+    }
+
+    function scaleHall() {
+        const hall = document.getElementById("hall");
+        const wrap = hall && hall.parentElement;
+        if (!hall || !wrap) return;
+
+        // Сбрасываем масштаб чтобы получить реальный размер
+        hall.style.transform = "scale(1)";
+
+        const availW = wrap.clientWidth;
+        const availH = wrap.clientHeight;
+        const hallW = hall.scrollWidth;
+        const hallH = hall.scrollHeight;
+
+        const scale = Math.min(availW / hallW, availH / hallH, 1);
+        hall.style.transform = `scale(${scale})`;
+    }
+
+    window.addEventListener("resize", scaleHall);
+
+    // ── Авторизация ───────────────────────────────────────────────────────────
+
+    function getToken() {
+        return localStorage.getItem("user_token");
+    }
+
+    function saveToken(token) {
+        localStorage.setItem("user_token", token);
+    }
+
+    function normalizePhone(raw) {
+        const value = raw.trim();
+        if (!value) return "";
+        const withPlus = value.startsWith("+") ? "+" : "";
+        const digits = value.replace(/\D/g, "");
+        return withPlus + digits;
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function isValidPhone(phone) {
+        return /^\+[1-9]\d{7,14}$/.test(phone);
+    }
+
+    async function isAuthenticated() {
+        const token = getToken();
+        if (!token) return false;
+        const res = await fetch("/api/check-auth", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        return data.authenticated === true;
+    }
+
+    // Кнопка "Забронировать" — сначала проверяем авторизацию
+    document.getElementById("btn-order").addEventListener("click", async () => {
+        if (selected.size === 0) return;
+
+        const auth = await isAuthenticated();
+        if (!auth) {
+            // Показываем модалку
+            document.getElementById("auth-modal").classList.add("open");
+            document.getElementById("login-email").focus();
+            return;
+        }
+
+        // Авторизован — переходим к бронированию
+        const ids = [...selected.keys()].join(",");
+        window.location.href = `/booking?session=${sessionId}&seats=${ids}`;
+    });
+
+    // Кнопка "Войти" в модалке
+    document.getElementById("btn-login-submit").addEventListener("click", async () => {
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value;
+        const errorEl = document.getElementById("login-error");
+        errorEl.textContent = "";
+
+        if (!email || !password) {
+            errorEl.textContent = "Заполните все поля";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/user/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+
+            if (!res.ok) {
+                errorEl.textContent = "Неверный email или пароль";
+                return;
+            }
+
+            const data = await res.json();
+            saveToken(data.access_token);
+
+            // Закрываем модалку и переходим к бронированию
+            document.getElementById("auth-modal").classList.remove("open");
+            const ids = [...selected.keys()].join(",");
+            window.location.href = `/booking?session=${sessionId}&seats=${ids}`;
+
+        } catch {
+            errorEl.textContent = "Ошибка соединения";
+        }
+    });
+
+    // Переключение вкладок модалки
+    function switchModalTab(tab) {
+        document.querySelectorAll(".modal-tab").forEach((el, i) => {
+            el.classList.toggle("active", (i === 0) === (tab === "login"));
+        });
+        document.getElementById("modal-form-login").classList.toggle("active", tab === "login");
+        document.getElementById("modal-form-register").classList.toggle("active", tab === "register");
+        document.getElementById("login-error").textContent = "";
+        document.getElementById("reg-error").textContent = "";
+    }
+
+    // Enter в полях входа
+    ["login-email", "login-password"].forEach(id => {
+        document.getElementById(id).addEventListener("keydown", e => {
+            if (e.key === "Enter") document.getElementById("btn-login-submit").click();
+        });
+    });
+
+    // Enter в полях регистрации
+    ["reg-name", "reg-surname", "reg-email", "reg-phone", "reg-password", "reg-password2"].forEach(id => {
+        document.getElementById(id).addEventListener("keydown", e => {
+            if (e.key === "Enter") document.getElementById("btn-reg-submit").click();
+        });
+    });
+
+    // Кнопка "Зарегистрироваться" в модалке
+    document.getElementById("btn-reg-submit").addEventListener("click", async () => {
+        const name = document.getElementById("reg-name").value.trim();
+        const surname = document.getElementById("reg-surname").value.trim();
+        const email = document.getElementById("reg-email").value.trim();
+        const phone = normalizePhone(document.getElementById("reg-phone").value);
+        const password = document.getElementById("reg-password").value;
+        const password2 = document.getElementById("reg-password2").value;
+        const errorEl = document.getElementById("reg-error");
+        errorEl.textContent = "";
+
+        if (!name || !surname || !email || !phone || !password || !password2) {
+            errorEl.textContent = "Заполните все поля";
+            return;
+        }
+        if (!isValidEmail(email)) {
+            errorEl.textContent = "Введите корректный email";
+            return;
+        }
+        if (!isValidPhone(phone)) {
+            errorEl.textContent = "Введите телефон в международном формате, например +79991234567";
+            return;
+        }
+        if (password !== password2) {
+            errorEl.textContent = "Пароли не совпадают";
+            return;
+        }
+        if (password.length < 6) {
+            errorEl.textContent = "Пароль должен быть не менее 6 символов";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/user/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, surname, email, phone, password }),
+            });
+
+            if (res.status === 409) {
+                errorEl.textContent = "Пользователь с таким email уже существует";
+                return;
+            }
+            if (!res.ok) {
+                errorEl.textContent = "Ошибка регистрации";
+                return;
+            }
+
+            const data = await res.json();
+            saveToken(data.access_token);
+            document.getElementById("auth-modal").classList.remove("open");
+            document.getElementById("reg-error").textContent = "";
+
+        } catch {
+            errorEl.textContent = "Ошибка соединения";
+        }
+    });
+
+    // Кнопки "Отмена"
+    document.getElementById("btn-modal-cancel").addEventListener("click", () => {
+        document.getElementById("auth-modal").classList.remove("open");
+    });
+    document.getElementById("btn-modal-cancel2").addEventListener("click", () => {
+        document.getElementById("auth-modal").classList.remove("open");
+    });
+
+    // Закрытие по клику вне модалки
+    document.getElementById("auth-modal").addEventListener("click", e => {
+        if (e.target === document.getElementById("auth-modal")) {
+            document.getElementById("auth-modal").classList.remove("open");
+        }
+    });
+
+    // Escape
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") document.getElementById("auth-modal").classList.remove("open");
+    });
+
+    renderHeaderAuth();
+    load();
+</script>
+
+</body>
+</html>

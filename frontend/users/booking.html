@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бронирование</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #1a1a2e;
+            padding: 16px 40px;
+            border-bottom: 1px solid #2d2d5e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            color: #a5b4fc;
+            text-decoration: none;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        header nav a {
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .profile-link {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #2d2d5e;
+            border-radius: 999px;
+            justify-content: center;
+        }
+
+        .profile-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            width: min(680px, 100%);
+            background: #1a1a2e;
+            border: 1px solid #2d2d5e;
+            border-radius: 16px;
+            padding: 28px;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+
+        .meta {
+            display: grid;
+            gap: 10px;
+            color: #cbd5e1;
+            margin-bottom: 18px;
+        }
+
+        .seats {
+            margin: 14px 0;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .total {
+            margin-top: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #a5b4fc;
+        }
+
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #fff;
+        }
+
+        .hint {
+            margin-top: 12px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .error {
+            margin-top: 12px;
+            color: #f87171;
+            font-size: 14px;
+            min-height: 18px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <a href="/movies" class="logo">КиноЗал</a>
+    <nav>
+        <a href="/movies">Все фильмы</a>
+        <a href="/login" id="auth-link" style="display:none">Войти</a>
+        <a href="/profile" id="profile-link" class="profile-link" style="display:none" title="Личный кабинет" aria-label="Личный кабинет">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="card" id="card">
+        <h1>Проверяем выбранные места...</h1>
+    </div>
+</main>
+
+<script>
+    async function renderHeaderAuth() {
+        const authLink = document.getElementById("auth-link");
+        const profileLink = document.getElementById("profile-link");
+        const token = localStorage.getItem("user_token");
+
+        if (!token) {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/check-auth", {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok && data.authenticated) {
+                authLink.style.display = "none";
+                profileLink.style.display = "inline-flex";
+            } else {
+                localStorage.removeItem("user_token");
+                authLink.style.display = "inline-flex";
+                profileLink.style.display = "none";
+            }
+        } catch {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+        }
+    }
+
+    const card = document.getElementById("card");
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session");
+    const seatIds = (params.get("seats") || "")
+        .split(",")
+        .map(s => Number(s.trim()))
+        .filter(n => Number.isFinite(n) && n > 0);
+
+    function formatDate(iso) {
+        const d = new Date(iso);
+        return d.toLocaleString("ru-RU", {
+            day: "numeric", month: "long", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    function categoryPrice(category, basePrice) {
+        if (category === "vip") return Math.round(basePrice * 1.5);
+        if (category === "premium") return Math.round(basePrice * 2);
+        return basePrice;
+    }
+
+    function showError(text) {
+        card.innerHTML = `
+            <h1>${text}</h1>
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="history.back()">Назад</button>
+                <a href="/movies"><button class="btn btn-primary">К фильмам</button></a>
+            </div>
+        `;
+    }
+
+    async function confirmBooking() {
+        const token = localStorage.getItem("user_token");
+        if (!token) {
+            window.location.href = `/login?next=${encodeURIComponent(window.location.href)}`;
+            return;
+        }
+
+        const errorEl = document.getElementById("booking-error");
+        const btn = document.getElementById("confirm-btn");
+        if (errorEl) errorEl.textContent = "";
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await fetch("/api/user/bookings", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    session_id: Number(sessionId),
+                    seat_ids: seatIds,
+                }),
+            });
+
+            if (res.status === 401) {
+                localStorage.removeItem("user_token");
+                window.location.href = `/login?next=${encodeURIComponent(window.location.href)}`;
+                return;
+            }
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                if (errorEl) {
+                    errorEl.textContent = err.detail || "Не удалось завершить бронирование";
+                }
+                return;
+            }
+
+            window.location.href = "/profile";
+        } catch {
+            if (errorEl) errorEl.textContent = "Ошибка соединения";
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async function loadBooking() {
+        if (!sessionId || seatIds.length === 0) {
+            showError("Некорректные параметры бронирования");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/sessions/${sessionId}`);
+            if (!res.ok) {
+                showError("Не удалось загрузить данные сеанса");
+                return;
+            }
+
+            const data = await res.json();
+            if (data.error) {
+                showError("Сеанс не найден");
+                return;
+            }
+
+            const chosen = data.seats.filter(s => seatIds.includes(s.id));
+            if (chosen.length === 0) {
+                showError("Выбранные места не найдены");
+                return;
+            }
+
+            const seatLabels = chosen
+                .sort((a, b) => a.row - b.row || a.number - b.number)
+                .map(s => `Ряд ${s.row}, место ${s.number}`);
+
+            const total = chosen.reduce(
+                (sum, s) => sum + categoryPrice(s.category, data.session.base_price),
+                0
+            );
+
+            card.innerHTML = `
+                <h1>Подтверждение бронирования</h1>
+                <div class="meta">
+                    <div><strong>Фильм:</strong> ${data.session.movie_name || "-"}</div>
+                    <div><strong>Зал:</strong> ${data.session.hall_name || "-"}</div>
+                    <div><strong>Сеанс:</strong> ${formatDate(data.session.starts_at)}</div>
+                </div>
+                <div class="seats">
+                    <strong>Места:</strong><br>
+                    ${seatLabels.join("<br>")}
+                </div>
+                <div class="total">Итого: ${total} ₽</div>
+                <div class="actions">
+                    <button class="btn btn-secondary" onclick="history.back()">Изменить места</button>
+                    <button class="btn btn-primary" id="confirm-btn">Подтвердить</button>
+                </div>
+                <div class="hint">После подтверждения бронирование появится в личном кабинете.</div>
+                <div class="error" id="booking-error"></div>
+            `;
+
+            const btn = document.getElementById("confirm-btn");
+            if (btn) btn.addEventListener("click", confirmBooking);
+
+        } catch {
+            showError("Ошибка соединения");
+        }
+    }
+
+    renderHeaderAuth();
+    loadBooking();
+</script>
+</body>
+</html>

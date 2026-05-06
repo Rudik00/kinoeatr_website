@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход / Регистрация</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Шапка */
+        header {
+            background: #1a1a2e;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2d2d5e;
+        }
+
+        header .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        header .logo svg {
+            height: 52px;
+            width: auto;
+            filter: drop-shadow(0 0 6px rgba(165,180,252,0.4));
+        }
+
+        header .logo span {
+            font-size: 20px;
+            font-weight: 700;
+            color: #a5b4fc;
+            letter-spacing: 1px;
+        }
+
+        /* Контент */
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #2d2d5e;
+            border-radius: 16px;
+            padding: 36px;
+            width: 420px;
+            max-width: 100%;
+        }
+
+        /* Переключатель вкладок */
+        .tabs {
+            display: flex;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #2d2d5e;
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .tab.active {
+            color: #a5b4fc;
+            border-bottom-color: #a5b4fc;
+        }
+
+        /* Форма */
+        .form { display: none; }
+        .form.active { display: block; }
+
+        .field {
+            margin-bottom: 14px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .field input {
+            width: 100%;
+            background: #0f0f1a;
+            border: 1px solid #2d2d5e;
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #f1f5f9;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .field input:focus { border-color: #a5b4fc; }
+
+        .field-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .error-msg {
+            font-size: 13px;
+            color: #f87171;
+            margin-bottom: 14px;
+            min-height: 18px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: #4f46e5;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 4px;
+        }
+
+        .btn-submit:hover { background: #4338ca; }
+        .btn-submit:disabled { background: #374151; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<header>
+    <a href="/movies" class="logo">
+        <svg viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 10 Q10 10 10 20 L10 90 L50 120 L50 50 L90 10 Z" fill="#a5b4fc"/>
+            <rect x="13" y="22" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="35" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="48" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="61" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="13" y="74" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="28" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="41" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="54" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="67" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+            <rect x="80" y="13" width="8" height="6" rx="1" fill="#0f0f1a"/>
+        </svg>
+        <span>КиноЗал</span>
+    </a>
+</header>
+
+<main>
+    <div class="card">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('login')">Войти</div>
+            <div class="tab" onclick="switchTab('register')">Регистрация</div>
+        </div>
+
+        <!-- Форма входа -->
+        <form class="form active" id="form-login" onsubmit="doLogin(event)">
+            <div class="field">
+                <label>Email</label>
+                <input type="email" id="login-email" placeholder="example@mail.ru" required>
+            </div>
+            <div class="field">
+                <label>Пароль</label>
+                <input type="password" id="login-password" placeholder="••••••••" required>
+            </div>
+            <div class="error-msg" id="login-error"></div>
+            <button class="btn-submit" type="submit">Войти</button>
+        </form>
+
+        <!-- Форма регистрации -->
+        <form class="form" id="form-register" onsubmit="doRegister(event)">
+            <div class="field-row">
+                <div class="field">
+                    <label>Имя</label>
+                    <input type="text" id="reg-name" placeholder="Иван" required>
+                </div>
+                <div class="field">
+                    <label>Фамилия</label>
+                    <input type="text" id="reg-surname" placeholder="Иванов" required>
+                </div>
+            </div>
+            <div class="field">
+                <label>Email</label>
+                <input type="email" id="reg-email" placeholder="example@mail.ru" required>
+            </div>
+            <div class="field">
+                <label>Телефон</label>
+                <input type="tel" id="reg-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel" required>
+            </div>
+            <div class="field">
+                <label>Пароль</label>
+                <input type="password" id="reg-password" placeholder="••••••••" required minlength="6">
+            </div>
+            <div class="field">
+                <label>Повторите пароль</label>
+                <input type="password" id="reg-password2" placeholder="••••••••" required minlength="6">
+            </div>
+            <div class="error-msg" id="reg-error"></div>
+            <button class="btn-submit" type="submit">Зарегистрироваться</button>
+        </form>
+    </div>
+</main>
+
+<datalist id="country-phone-codes">
+    <option value="+7">Россия (+7)</option>
+    <option value="+375">Беларусь (+375)</option>
+    <option value="+380">Украина (+380)</option>
+    <option value="+998">Узбекистан (+998)</option>
+    <option value="+996">Киргизия (+996)</option>
+    <option value="+992">Таджикистан (+992)</option>
+    <option value="+374">Армения (+374)</option>
+    <option value="+994">Азербайджан (+994)</option>
+    <option value="+995">Грузия (+995)</option>
+    <option value="+49">Германия (+49)</option>
+    <option value="+44">Великобритания (+44)</option>
+    <option value="+1">США/Канада (+1)</option>
+    <option value="+33">Франция (+33)</option>
+    <option value="+39">Италия (+39)</option>
+    <option value="+34">Испания (+34)</option>
+    <option value="+90">Турция (+90)</option>
+    <option value="+971">ОАЭ (+971)</option>
+</datalist>
+
+<script>
+    // Если уже залогинен — редиректим на фильмы
+    const token = localStorage.getItem("user_token");
+    if (token) {
+        fetch("/api/check-auth", { headers: { "Authorization": `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(d => { if (d.authenticated) window.location.href = "/movies"; });
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll(".tab").forEach((el, i) => {
+            el.classList.toggle("active", (i === 0) === (tab === "login"));
+        });
+        document.getElementById("form-login").classList.toggle("active", tab === "login");
+        document.getElementById("form-register").classList.toggle("active", tab === "register");
+        document.getElementById("login-error").textContent = "";
+        document.getElementById("reg-error").textContent = "";
+    }
+
+    // Куда перейти после входа
+    function redirectAfterLogin() {
+        const back = new URLSearchParams(window.location.search).get("next");
+        window.location.href = back || "/movies";
+    }
+
+    function normalizePhone(raw) {
+        const value = raw.trim();
+        if (!value) return "";
+        const withPlus = value.startsWith("+") ? "+" : "";
+        const digits = value.replace(/\D/g, "");
+        return withPlus + digits;
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function isValidPhone(phone) {
+        return /^\+[1-9]\d{7,14}$/.test(phone);
+    }
+
+    async function doLogin(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector("button");
+        const errEl = document.getElementById("login-error");
+        errEl.textContent = "";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch("/api/user/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: document.getElementById("login-email").value.trim(),
+                    password: document.getElementById("login-password").value,
+                }),
+            });
+
+            if (!res.ok) {
+                errEl.textContent = "Неверный email или пароль";
+                return;
+            }
+
+            const data = await res.json();
+            localStorage.setItem("user_token", data.access_token);
+            redirectAfterLogin();
+
+        } catch {
+            errEl.textContent = "Ошибка соединения";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function doRegister(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector("button");
+        const errEl = document.getElementById("reg-error");
+        errEl.textContent = "";
+        btn.disabled = true;
+
+        const password = document.getElementById("reg-password").value;
+        const password2 = document.getElementById("reg-password2").value;
+        const email = document.getElementById("reg-email").value.trim();
+        const phone = normalizePhone(document.getElementById("reg-phone").value);
+
+        if (!isValidEmail(email)) {
+            errEl.textContent = "Введите корректный email";
+            btn.disabled = false;
+            return;
+        }
+        if (!isValidPhone(phone)) {
+            errEl.textContent = "Введите телефон в международном формате, например +79991234567";
+            btn.disabled = false;
+            return;
+        }
+
+        if (password !== password2) {
+            document.getElementById("reg-error").textContent = "Пароли не совпадают";
+            btn.disabled = false;
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/user/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: document.getElementById("reg-name").value.trim(),
+                    surname: document.getElementById("reg-surname").value.trim(),
+                    email,
+                    phone,
+                    password,
+                }),
+            });
+
+            if (res.status === 409) {
+                errEl.textContent = "Пользователь с таким email уже существует";
+                return;
+            }
+
+            if (!res.ok) {
+                errEl.textContent = "Ошибка регистрации";
+                return;
+            }
+
+            const data = await res.json();
+            localStorage.setItem("user_token", data.access_token);
+            redirectAfterLogin();
+
+        } catch {
+            errEl.textContent = "Ошибка соединения";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>

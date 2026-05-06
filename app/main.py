@@ -151,3 +151,23 @@ async def home_page():
 @app.get("/movie/{movie_id}")
 async def movie_detail(movie_id: int):
     return FileResponse("frontend/users/movies.html")
+
+
+@app.get("/session/{session_id}")
+async def session_hall(session_id: int):
+    return FileResponse("frontend/users/hall.html")
+
+
+@app.get("/booking")
+async def booking_page():
+    return FileResponse("frontend/users/booking.html")
+
+
+@app.get("/profile")
+async def profile_page():
+    return FileResponse("frontend/users/profile.html")
+
+
+@app.get("/login")
+async def user_login_page():
+    return FileResponse("frontend/users/auth.html")

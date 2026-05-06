@@ -8,7 +8,7 @@ from typing import List
 
 from ..db import get_db
 from ..utils.security import verify_password
-from ..utils.jwt_token import create_access_token, decode_access_token
+from ..utils.jwt_token import create_access_token_admin, decode_access_token_admin
 from ..database.madels_db import (
     Admins,
     HallSeat, CinemaHall,
@@ -56,7 +56,7 @@ def get_current_admin(
 ):
     try:
         token = credentials.credentials
-        payload = decode_access_token(token)
+        payload = decode_access_token_admin(token)
         if payload is None or payload.get("role") != "admin":
             raise RequestValidationError(
                 errors=[
@@ -144,7 +144,7 @@ async def admin_login(
                 ]
             )
 
-        token = create_access_token(
+        token = create_access_token_admin(
             {"sub": existing_admin.email_admin, "role": "admin"}
         )
         return {"access_token": token, "token_type": "bearer"}

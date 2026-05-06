@@ -50,9 +50,24 @@
             margin-left: 24px;
             font-size: 14px;
             transition: color 0.2s;
+            display: inline-flex;
+            align-items: center;
         }
 
         header nav a:hover { color: #a5b4fc; }
+
+        .profile-link {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #2d2d5e;
+            border-radius: 999px;
+            justify-content: center;
+        }
+
+        .profile-link svg {
+            width: 18px;
+            height: 18px;
+        }
 
         /* Основной контент */
         main {
@@ -262,6 +277,13 @@
     </a>
     <nav>
         <a href="/movies">Все фильмы</a>
+        <a href="/login" id="auth-link" style="display:none">Войти</a>
+        <a href="/profile" id="profile-link" class="profile-link" style="display:none" title="Личный кабинет" aria-label="Личный кабинет">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M4 20a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+        </a>
     </nav>
 </header>
 
@@ -275,6 +297,36 @@
 </main>
 
 <script>
+    async function renderHeaderAuth() {
+        const authLink = document.getElementById("auth-link");
+        const profileLink = document.getElementById("profile-link");
+        const token = localStorage.getItem("user_token");
+
+        if (!token) {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/check-auth", {
+                headers: { "Authorization": `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok && data.authenticated) {
+                authLink.style.display = "none";
+                profileLink.style.display = "inline-flex";
+            } else {
+                localStorage.removeItem("user_token");
+                authLink.style.display = "inline-flex";
+                profileLink.style.display = "none";
+            }
+        } catch {
+            authLink.style.display = "inline-flex";
+            profileLink.style.display = "none";
+        }
+    }
+
     // Берём id из URL: /movie/5
     const movieId = window.location.pathname.split("/").filter(Boolean).pop();
 
@@ -385,6 +437,7 @@
         }
     }
 
+    renderHeaderAuth();
     load();
 </script>
 

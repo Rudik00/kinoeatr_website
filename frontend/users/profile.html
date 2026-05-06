@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: sans-serif;
+            background: #0f0f1a;
+            color: #f1f5f9;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1a1a2e;
+            border-bottom: 1px solid #2d2d5e;
+            padding: 16px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            text-decoration: none;
+            color: #a5b4fc;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .logout-btn {
+            border: 1px solid #2d2d5e;
+            background: transparent;
+            color: #cbd5e1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        main {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 26px;
+        }
+
+        .layout {
+            display: flex;
+            gap: 18px;
+            align-items: flex-start;
+        }
+
+        .content {
+            flex: 1;
+            background: #1a1a2e;
+            border: 1px solid #2d2d5e;
+            border-radius: 16px;
+            padding: 22px;
+            min-height: 520px;
+        }
+
+        .tabs {
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tab {
+            border: 1px solid #2d2d5e;
+            background: #1a1a2e;
+            color: #cbd5e1;
+            padding: 12px 14px;
+            border-radius: 10px;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .tab.active {
+            border-color: #a5b4fc;
+            color: #a5b4fc;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin-bottom: 14px;
+        }
+
+        .sub {
+            color: #94a3b8;
+            margin-bottom: 22px;
+            line-height: 1.5;
+        }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .kv {
+            background: #0f0f1a;
+            border: 1px solid #2d2d5e;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .kv .k {
+            color: #64748b;
+            font-size: 12px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kv .v { color: #e2e8f0; }
+
+        .booking-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .booking-card {
+            border: 1px solid #2d2d5e;
+            background: #0f0f1a;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .booking-title {
+            color: #a5b4fc;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .booking-meta {
+            color: #cbd5e1;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .booking-total {
+            margin-top: 8px;
+            color: #22c55e;
+            font-weight: 700;
+        }
+
+        .empty {
+            color: #64748b;
+            padding: 14px 0;
+        }
+
+        .form {
+            max-width: 520px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .field label {
+            display: block;
+            color: #94a3b8;
+            font-size: 12px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .field input {
+            width: 100%;
+            background: #0f0f1a;
+            border: 1px solid #2d2d5e;
+            border-radius: 8px;
+            color: #f1f5f9;
+            padding: 10px 12px;
+            outline: none;
+        }
+
+        .field input:focus { border-color: #a5b4fc; }
+
+        .hint {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .error {
+            color: #f87171;
+            min-height: 18px;
+            font-size: 13px;
+        }
+
+        .ok {
+            color: #22c55e;
+            min-height: 18px;
+            font-size: 13px;
+        }
+
+        .save-btn {
+            width: fit-content;
+            border: none;
+            border-radius: 8px;
+            padding: 11px 14px;
+            background: #4f46e5;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+            .layout { flex-direction: column-reverse; }
+            .tabs { width: 100%; flex-direction: row; }
+            .tab { flex: 1; }
+            .user-grid { grid-template-columns: 1fr; }
+            header { padding: 12px 20px; }
+            main { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <a href="/movies" class="logo">КиноЗал</a>
+    <button class="logout-btn" id="logout-btn">Выйти</button>
+</header>
+
+<main>
+    <div class="layout">
+        <div class="content">
+            <section class="section active" id="section-profile">
+                <h1>Личный кабинет</h1>
+                <p class="sub">Здесь отображаются ваши данные и история бронирований.</p>
+
+                <div class="user-grid" id="user-grid"></div>
+
+                <h2 style="font-size:18px;margin-bottom:10px;">Мои бронирования</h2>
+                <div class="booking-list" id="booking-list"></div>
+            </section>
+
+            <section class="section" id="section-settings">
+                <h1>Настройки</h1>
+                <p class="sub">Можно изменить email, телефон и пароль.</p>
+
+                <form class="form" id="settings-form">
+                    <div class="field">
+                        <label>Email</label>
+                        <input type="email" id="set-email" placeholder="Email">
+                    </div>
+                    <div class="field">
+                        <label>Телефон</label>
+                        <input type="tel" id="set-phone" placeholder="Телефон" list="country-phone-codes" autocomplete="tel">
+                    </div>
+                    <div class="field">
+                        <label>Текущий пароль (нужен только для смены пароля)</label>
+                        <input type="password" id="set-current-password" placeholder="••••••••">
+                    </div>
+                    <div class="field">
+                        <label>Новый пароль</label>
+                        <input type="password" id="set-new-password" placeholder="••••••••">
+                    </div>
+                    <div class="field">
+                        <label>Повторите новый пароль</label>
+                        <input type="password" id="set-new-password2" placeholder="••••••••">
+                    </div>
+                    <div class="hint">Новый пароль должен быть не короче 6 символов.</div>
+                    <div class="error" id="settings-error"></div>
+                    <div class="ok" id="settings-ok"></div>
+                    <button class="save-btn" type="submit">Сохранить изменения</button>
+                </form>
+            </section>
+        </div>
+
+        <aside class="tabs">
+            <button class="tab active" id="tab-profile" type="button">Личный кабинет</button>
+            <button class="tab" id="tab-settings" type="button">Настройки</button>
+        </aside>
+    </div>
+</main>
+
+<datalist id="country-phone-codes">
+    <option value="+7">Россия (+7)</option>
+    <option value="+375">Беларусь (+375)</option>
+    <option value="+380">Украина (+380)</option>
+    <option value="+998">Узбекистан (+998)</option>
+    <option value="+996">Киргизия (+996)</option>
+    <option value="+992">Таджикистан (+992)</option>
+    <option value="+374">Армения (+374)</option>
+    <option value="+994">Азербайджан (+994)</option>
+    <option value="+995">Грузия (+995)</option>
+    <option value="+49">Германия (+49)</option>
+    <option value="+44">Великобритания (+44)</option>
+    <option value="+1">США/Канада (+1)</option>
+    <option value="+33">Франция (+33)</option>
+    <option value="+39">Италия (+39)</option>
+    <option value="+34">Испания (+34)</option>
+    <option value="+90">Турция (+90)</option>
+    <option value="+971">ОАЭ (+971)</option>
+</datalist>
+
+<script>
+    function getToken() {
+        return localStorage.getItem("user_token");
+    }
+
+    function normalizePhone(raw) {
+        const value = raw.trim();
+        if (!value) return "";
+        const withPlus = value.startsWith("+") ? "+" : "";
+        const digits = value.replace(/\D/g, "");
+        return withPlus + digits;
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
+
+    function isValidPhone(phone) {
+        return /^\+[1-9]\d{7,14}$/.test(phone);
+    }
+
+    function switchTab(tab) {
+        const isProfile = tab === "profile";
+        document.getElementById("tab-profile").classList.toggle("active", isProfile);
+        document.getElementById("tab-settings").classList.toggle("active", !isProfile);
+        document.getElementById("section-profile").classList.toggle("active", isProfile);
+        document.getElementById("section-settings").classList.toggle("active", !isProfile);
+    }
+
+    async function fetchJSON(url, options = {}) {
+        const token = getToken();
+        const headers = Object.assign({}, options.headers || {});
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(url, Object.assign({}, options, { headers }));
+        if (res.status === 401) {
+            localStorage.removeItem("user_token");
+            window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+            throw new Error("unauthorized");
+        }
+        return res;
+    }
+
+    function renderUser(user) {
+        const grid = document.getElementById("user-grid");
+        grid.innerHTML = `
+            <div class="kv"><div class="k">Имя</div><div class="v">${user.name || "-"}</div></div>
+            <div class="kv"><div class="k">Фамилия</div><div class="v">${user.surname || "-"}</div></div>
+            <div class="kv"><div class="k">Email</div><div class="v">${user.email || "-"}</div></div>
+            <div class="kv"><div class="k">Телефон</div><div class="v">${user.phone || "-"}</div></div>
+        `;
+
+        document.getElementById("set-email").value = user.email || "";
+        document.getElementById("set-phone").value = user.phone || "";
+    }
+
+    function formatDate(iso) {
+        if (!iso) return "-";
+        const d = new Date(iso);
+        return d.toLocaleString("ru-RU", {
+            day: "numeric", month: "long", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+        });
+    }
+
+    function renderBookings(bookings) {
+        const list = document.getElementById("booking-list");
+        if (!bookings || bookings.length === 0) {
+            list.innerHTML = `<div class="empty">У вас пока нет бронирований.</div>`;
+            return;
+        }
+
+        list.innerHTML = bookings.map(b => {
+            const seats = (b.seats || [])
+                .map(s => `Ряд ${s.row}, место ${s.number}`)
+                .join(", ");
+
+            return `
+                <div class="booking-card">
+                    <div class="booking-title">${b.movie_name || "Фильм"}</div>
+                    <div class="booking-meta">
+                        <div><strong>Зал:</strong> ${b.hall_name || "-"}</div>
+                        <div><strong>Сеанс:</strong> ${formatDate(b.starts_at)}</div>
+                        <div><strong>Места:</strong> ${seats || "-"}</div>
+                    </div>
+                    <div class="booking-total">Сумма: ${b.total_price || 0} ₽</div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    async function loadProfilePage() {
+        const token = getToken();
+        if (!token) {
+            window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+            return;
+        }
+
+        const [meRes, bookingsRes] = await Promise.all([
+            fetchJSON("/api/user/me"),
+            fetchJSON("/api/user/bookings"),
+        ]);
+
+        const meData = await meRes.json();
+        const bookingsData = await bookingsRes.json();
+
+        renderUser(meData);
+        renderBookings(bookingsData.bookings || []);
+    }
+
+    document.getElementById("tab-profile").addEventListener("click", () => switchTab("profile"));
+    document.getElementById("tab-settings").addEventListener("click", () => switchTab("settings"));
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+        localStorage.removeItem("user_token");
+        window.location.href = "/movies";
+    });
+
+    document.getElementById("settings-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const err = document.getElementById("settings-error");
+        const ok = document.getElementById("settings-ok");
+        err.textContent = "";
+        ok.textContent = "";
+
+        const email = document.getElementById("set-email").value.trim();
+        const phone = normalizePhone(document.getElementById("set-phone").value);
+        const currentPassword = document.getElementById("set-current-password").value;
+        const newPassword = document.getElementById("set-new-password").value;
+        const newPassword2 = document.getElementById("set-new-password2").value;
+
+        if (!isValidEmail(email)) {
+            err.textContent = "Введите корректный email";
+            return;
+        }
+        if (!isValidPhone(phone)) {
+            err.textContent = "Введите телефон в международном формате, например +79991234567";
+            return;
+        }
+        if (newPassword || newPassword2) {
+            if (newPassword !== newPassword2) {
+                err.textContent = "Новые пароли не совпадают";
+                return;
+            }
+            if (newPassword.length < 6) {
+                err.textContent = "Новый пароль должен быть не менее 6 символов";
+                return;
+            }
+            if (!currentPassword) {
+                err.textContent = "Введите текущий пароль для смены пароля";
+                return;
+            }
+        }
+
+        const body = {
+            email,
+            phone,
+            current_password: currentPassword || null,
+            new_password: newPassword || null,
+        };
+
+        try {
+            const res = await fetchJSON("/api/user/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                err.textContent = data.detail || "Не удалось сохранить настройки";
+                return;
+            }
+
+            const data = await res.json();
+            if (data.access_token) {
+                localStorage.setItem("user_token", data.access_token);
+            }
+
+            document.getElementById("set-current-password").value = "";
+            document.getElementById("set-new-password").value = "";
+            document.getElementById("set-new-password2").value = "";
+            ok.textContent = "Настройки успешно обновлены";
+
+            if (data.user) {
+                renderUser(data.user);
+            }
+        } catch (e2) {
+            if (String(e2.message) !== "unauthorized") {
+                err.textContent = "Ошибка соединения";
+            }
+        }
+    });
+
+    loadProfilePage().catch(() => {});
+</script>
+</body>
+</html>
